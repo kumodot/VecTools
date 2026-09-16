@@ -125,7 +125,9 @@ function handleBake(msg) {
     resolution = 128,
     smoothIterations = 8,
     targetSize = 100,
-    minIslandPct = 0
+    minIslandPct = 0,
+    cutFront = null,
+    cutBack = null
   } = params;
 
   /**
@@ -141,7 +143,7 @@ function handleBake(msg) {
   const meta = buildField({
     sdf2d, thickness, w, h,
     profile, halfThickness, roundRadius, bulge, bulgePower,
-    maxBulge, thinProtect, resolution,
+    maxBulge, thinProtect, resolution, cutFront, cutBack,
     onProgress: (v) => progress('field', v)
   });
 

@@ -158,6 +158,8 @@ function domeHalfHeight(d, lw, useLocal, halfThickness, bulge, bulgePower, maxBu
  * @param {number} opts.resolution  Target voxel count along the longest xy
  *   axis.
  * @param {number} [opts.zPadding=3]  Empty voxels above and below the shape.
+ * @param {number|null} [opts.cutFront]  Flat front face at world z = cutFront (pixel units), null = off.
+ * @param {number|null} [opts.cutBack]  Flat back face at world z = -cutBack (pixel units), null = off.
  * @param {(t: number) => void} [opts.onProgress]  Called with 0..1 per batch
  *   of z slices.
  * @returns {{field: Float32Array, nx: number, ny: number, nz: number,
@@ -180,8 +182,14 @@ export function buildField(opts) {
     thinProtect = 0,
     resolution = 128,
     zPadding = 3,
+    cutFront = null,   // pixel units: keep world z <= cutFront  (flat front face); null = off
+    cutBack = null,    // pixel units: keep world z >= -cutBack  (flat back face); null = off
     onProgress
   } = opts;
+  // gridToWorld negates z, so world z = -pz: a front cut keeps pz >= -cutFront,
+  // a back cut keeps pz <= cutBack. Both are applied as extra half-space SDFs.
+  const zFront = (cutFront != null && cutFront >= 0) ? -cutFront : null;
+  const zBack = (cutBack != null && cutBack >= 0) ? cutBack : null;
 
   const useLocal = profile === PROFILES.LOCAL_WIDTH;
   const isDome = useLocal || profile === PROFILES.PILLOW;
@@ -298,6 +306,8 @@ export function buildField(opts) {
       for (let i = 0; i < nx; i++) {
         const idx = rowOff + i;
         let v = roundedBoxSDF(planeD[idx], pz, planeH[idx], planeR[idx]);
+        if (zFront !== null && zFront - pz > v) v = zFront - pz;
+        if (zBack !== null && pz - zBack > v) v = pz - zBack;
         if (v > clampPos) v = clampPos;
         field[slice + idx] = v;
       }

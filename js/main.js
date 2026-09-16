@@ -5,6 +5,11 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.4.0  SVG input: drop / load an .svg in either tab, it is rasterized by
+ *         the browser (SVG raster slider) and goes through the same pipeline,
+ *         so it lands in the 3D tab directly. Cut front / Cut back applied to
+ *         preview and bake (flat back for printing). Bake button shows when the
+ *         mesh is out of date.
  *  0.3.0  Paint shortcuts (X, B, V, [ ]), Navigation group: orbit laziness,
  *         game-style fly mode (WASD + mouse look, pointer lock), hide pointer.
  *  0.2.0  HDR/EXR environments from the hdr/ folder (mesh + raymarch preview),
@@ -19,7 +24,7 @@
 import { TraceApp } from './appTrace.js';
 import { App3D } from './app3d.js';
 
-export const APP_VERSION = '0.3.0';
+export const APP_VERSION = '0.4.0';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 
@@ -128,6 +133,7 @@ function main() {
     if (current === 'three') { app3d.setSource(r); dirty3d = false; }
   };
   trace.onSendTo3D = () => activate('three');
+  app3d.onLoadSvg = (file) => trace.loadFile(file); // result lands in the 3D tab via trace.onResult
   initAbout();
   initProject(trace, app3d);
   window.vectools = { trace, app3d, version: APP_VERSION }; // handy for debugging from the console

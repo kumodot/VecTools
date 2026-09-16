@@ -22,11 +22,11 @@ The lettering above is `Samples/VecTools_Sample.jpg` traced and inflated with th
 
 ## Run it
 
-**Local (recommended):** download / clone, double-click `RUN_VecTools_v0.3.0.bat`. It starts `python -m http.server` on port 8765 and opens the app. Python 3 required (ES modules and Web Workers do not load from `file://`). On macOS/Linux: `python3 -m http.server 8765` in the folder, then open `http://localhost:8765/`.
+**Local (recommended):** download / clone, double-click `RUN_VecTools_v0.4.0.bat`. It starts `python -m http.server` on port 8765 and opens the app. Python 3 required (ES modules and Web Workers do not load from `file://`). On macOS/Linux: `python3 -m http.server 8765` in the folder, then open `http://localhost:8765/`.
 
 **Hosted:** it is a static site, so any static host works. `index.html` redirects to the current versioned entry file.
 
-Try it with the images in `Samples/`.
+Try it with the images in `Samples/`. Already have a vector? Drop an `.svg` on either tab (it is rasterized at high resolution and goes straight to 3D).
 
 ## Workflow
 
@@ -43,7 +43,8 @@ Try it with the images in `Samples/`.
 - **Blob / Inflate**: the good part. The vector becomes a signed distance field and gets a rounded profile:
   - *Rounded extrude*: flat slab with a filleted edge. Strokes thinner than the fillet automatically turn into thinner rounded tubes, so hairlines never become fins.
   - *Pillow / dome* and *Local-width dome*: puffier profiles.
-  - Realtime GPU raymarch preview while you drag sliders, then **Bake mesh** (marching cubes + smoothing + island cleanup).
+  - Realtime GPU raymarch preview while you drag sliders, then **Bake mesh** (marching cubes + smoothing + island cleanup). The button lights up when the mesh is out of date.
+  - *Cut front* / *Cut back*: flat faces from the mid plane, in the preview and in the bake. Cut back at 0 gives a relief with a flat base for 3D printing.
 - **Environment**: drop `.hdr` / `.exr` maps in `hdr/` (or load one), rotation, intensity, exposure, HDR background.
 - **Material**: presets or custom color / metalness / roughness.
 - **Render**: supersampled anti-aliasing, glow, wireframe, flat shading, floor grid.

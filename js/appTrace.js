@@ -31,7 +31,7 @@ export class TraceApp {
       despeckle: 8, fillHoles: 0, fillAll: false,
       smooth: 1, cornerAngle: 60, simplify: 0.6,
       curves: true, curveError: 0.8,
-      minPathArea: 0,
+      minPathArea: 0, svgRasterRes: 2048,
       tool: 'pan', brushSize: 12,
       showImage: true, showMask: true, showFill: true, showStroke: true, showNodes: false, showCurves: true
     };
@@ -76,13 +76,14 @@ export class TraceApp {
     let g = UI.group(sb, 'Source');
     const drop = document.createElement('label');
     drop.className = 'drop';
-    drop.innerHTML = 'Click to load an image<br><small>or drop / paste (PNG, JPG, BMP, WEBP)</small><input type="file" accept="image/*">';
+    drop.innerHTML = 'Click to load an image or SVG<br><small>or drop / paste (PNG, JPG, BMP, WEBP, SVG)</small><input type="file" accept="image/*,.svg,image/svg+xml">';
     drop.querySelector('input').addEventListener('change', (e) => {
       if (e.target.files[0]) this.loadFile(e.target.files[0]);
       e.target.value = '';
     });
     g.appendChild(drop);
     this.srcInfo = UI.note(g, 'No image loaded.');
+    this.svgResSlider = UI.slider(g, st, 'svgRasterRes', { label: 'SVG raster', min: 512, max: 4096, step: 128, unit: 'px', onChange: () => { if (this.svgText) this.loadSVGText(this.svgText, this.baseName); }, title: 'Longest side used when an SVG is rasterized before tracing. Higher = finer curves, slower.' });
 
     g = UI.group(sb, 'Threshold');
     UI.slider(g, st, 'blur', { label: 'Pre-blur', min: 0, max: 6, step: 1, unit: 'px', onChange: ch, title: 'Box blur before thresholding. Kills JPEG noise and softens anti-aliasing.' });
@@ -159,6 +160,15 @@ export class TraceApp {
    * @param {File|Blob} file
    */
   async loadFile(file) {
+    const isSvg = /\.svg$/i.test(file.name || '') || file.type === 'image/svg+xml';
+    if (isSvg) {
+      try {
+        const text = await file.text();
+        await this.loadSVGText(text, (file.name || 'vector').replace(/\.[^.]+$/, ''));
+      } catch (err) { this.setStatus('Could not load SVG: ' + err.message, 'err'); }
+      return;
+    }
+    this.svgText = null;
     try {
       this.setStatus('Loading image…', 'busy');
       const bmp = await createImageBitmap(file);
@@ -177,6 +187,62 @@ export class TraceApp {
       this.trace();
     } catch (err) {
       this.setStatus('Could not load image: ' + err.message, 'err');
+    }
+  }
+
+  /**
+   * Rasterize an SVG string with the browser and feed it to the trace
+   * pipeline. Coverage (alpha) decides ink, so fill colour does not matter:
+   * a white logo on a transparent background traces the same as a black one.
+   * The SVG stays in memory so the raster resolution can be changed later.
+   * @param {string} text  SVG source
+   * @param {string} baseName
+   */
+  async loadSVGText(text, baseName) {
+    this.setStatus('Rasterizing SVG…', 'busy');
+    const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+    const root = doc.documentElement;
+    if (root.nodeName.toLowerCase() !== 'svg') throw new Error('not an SVG document');
+    // intrinsic size: prefer viewBox, fall back to width/height, then 1024
+    const num = (v) => { const m = /^\s*([0-9.]+)/.exec(v || ''); return m ? parseFloat(m[1]) : NaN; };
+    let vw = NaN, vh = NaN;
+    const vb = root.getAttribute('viewBox');
+    if (vb) { const p = vb.trim().split(/[\s,]+/).map(Number); if (p.length === 4) { vw = p[2]; vh = p[3]; } }
+    if (!(vw > 0 && vh > 0)) { vw = num(root.getAttribute('width')); vh = num(root.getAttribute('height')); }
+    if (!(vw > 0 && vh > 0)) { vw = 1024; vh = 1024; }
+    if (!vb) root.setAttribute('viewBox', `0 0 ${vw} ${vh}`);
+    const res = this.state.svgRasterRes;
+    const scale = res / Math.max(vw, vh);
+    const W = Math.max(8, Math.round(vw * scale)), H = Math.max(8, Math.round(vh * scale));
+    root.setAttribute('width', W); root.setAttribute('height', H);
+    root.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    const blob = new Blob([new XMLSerializer().serializeToString(doc)], { type: 'image/svg+xml' });
+    const url = URL.createObjectURL(blob);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('browser could not render this SVG')); i.src = url; });
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0, W, H);
+      const id = ctx.getImageData(0, 0, W, H);
+      // coverage -> black ink on white
+      const d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = d[i + 3] > 127 ? 0 : 255;
+        d[i] = v; d[i + 1] = v; d[i + 2] = v; d[i + 3] = 255;
+      }
+      ctx.putImageData(id, 0, 0);
+      const bmp = await createImageBitmap(c);
+      this.svgText = text;
+      this.baseName = baseName;
+      this.pixels = id.data; this.width = W; this.height = H;
+      this.view.setImage(bmp);
+      this.srcInfo.textContent = `${baseName}.svg  rasterized ${W}×${H}`;
+      this.state.invert = false;
+      this._refreshControls();
+      this.trace();
+    } finally {
+      URL.revokeObjectURL(url);
     }
   }
 

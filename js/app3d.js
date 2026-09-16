@@ -41,7 +41,7 @@ export class App3D {
       // blob (world units)
       profile: 'roundedExtrude', halfThickness: 3, roundRadius: 3,
       bulge: 1, bulgePower: 1, maxBulge: 3, thinProtect: 0, thicknessRadius: 6,
-      steps: 160, sectionOn: false, sectionZ: 0,
+      steps: 160, sectionOn: false, sectionZ: 0, backOn: false, backZ: 0,
       bakeRes: 512, smoothIter: 3, minIslandPct: 0,
       // environment
       hdr: '', hdrBackground: false, hdrBlur: 0, envRotation: 0, envIntensity: 1, exposure: 1,
@@ -62,6 +62,15 @@ export class App3D {
     this._applyMode();
     this._applyEnvironment();
     this.scanHdrFolder();
+    // drop an .svg (or image) on the 3D stage: goes through the trace pipeline and comes back here
+    const stage = els.stage;
+    stage.addEventListener('dragover', (e) => { e.preventDefault(); stage.classList.add('dragover'); });
+    stage.addEventListener('dragleave', () => stage.classList.remove('dragover'));
+    stage.addEventListener('drop', (e) => {
+      e.preventDefault(); stage.classList.remove('dragover');
+      const f = e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f && this.onLoadSvg) this.onLoadSvg(f);
+    });
   }
 
   // ------------------------------------------------------------------ UI
@@ -73,7 +82,8 @@ export class App3D {
     UI.slider(g, st, 'rasterRes', { label: 'Raster res', min: 256, max: 4096, step: 64, unit: 'px', onChange: () => this.rebuildRaster(), title: 'Resolution the vector is rasterized at for the SDF. Higher = sharper corners, slower.' });
     UI.checkbox(g, st, 'useCurves', { label: 'Use curves', onChange: () => { this.rebuildRaster(); this.rebuildExtrude(); } });
     UI.slider(g, st, 'sdfBlur', { label: 'Field smooth', min: 0, max: 4, step: 0.1, unit: 'px', onChange: () => this._requestSDF(), title: 'Gaussian blur of the distance field. ~1 px removes pixel-staircase shading bands; 0 keeps corners razor sharp.' });
-    this.srcNote = UI.note(g, 'No vector yet. Trace an image in the Vectorize tab.');
+    UI.buttons(g, [{ label: 'Load SVG…', onClick: () => this._pickSvg(), title: 'Skip the vectorizer: rasterize an SVG at high resolution and use it as the 3D source.' }]);
+    this.srcNote = UI.note(g, 'No vector yet. Trace an image in the Vectorize tab, or load an SVG.');
 
     // --- extrude ---
     this.gExtrude = UI.group(sb, 'Extrude');
@@ -99,14 +109,18 @@ export class App3D {
     this.rowThin = UI.slider(g, st, 'thinProtect', { label: 'Thin protect', min: 0, max: 1, step: 0.01, onChange: bl, title: 'Floor on the dome height so hairlines keep some volume.' });
     this.rowThickR = UI.slider(g, st, 'thicknessRadius', { label: 'Width search', min: 1, max: 30, step: 0.5, onChange: () => this._requestSDF(), title: 'Search radius for the local stroke width (Local-width profile).' });
     UI.slider(g, st, 'steps', { label: 'Preview steps', min: 32, max: 400, step: 8, onChange: bl, title: 'Raymarch steps. Lower if the preview is slow.' });
-    UI.checkbox(g, st, 'sectionOn', { label: 'Cutaway', onChange: bl, title: 'Slice the preview to inspect the profile.' });
-    UI.slider(g, st, 'sectionZ', { label: 'Cut height', min: 0, max: 20, step: 0.05, onChange: bl });
+    UI.checkbox(g, st, 'sectionOn', { label: 'Cut front', onChange: bl, title: 'Flat front face: everything above this height (from the mid plane) is removed. Applies to the preview and the bake.' });
+    UI.slider(g, st, 'sectionZ', { label: 'Front height', min: 0, max: 20, step: 0.05, onChange: bl });
+    UI.checkbox(g, st, 'backOn', { label: 'Cut back', onChange: bl, title: 'Flat back face: everything below this depth (from the mid plane) is removed. 0 = relief with a flat base, ready for 3D printing. Applies to the preview and the bake.' });
+    UI.slider(g, st, 'backZ', { label: 'Back depth', min: 0, max: 20, step: 0.05, onChange: bl });
 
     this.gBake = UI.group(sb, 'Bake mesh');
     g = this.gBake;
-    UI.slider(g, st, 'bakeRes', { label: 'Voxel res', min: 128, max: 1536, step: 32, onChange: null, title: 'Voxels along the longest axis. 512 is a good preview, 1024+ for final.' });
-    UI.slider(g, st, 'smoothIter', { label: 'Smooth', min: 0, max: 30, step: 1, onChange: null, title: 'Taubin smoothing passes. 0 keeps corners crisp.' });
-    UI.slider(g, st, 'minIslandPct', { label: 'Drop islands', min: 0, max: 20, step: 0.05, unit: '%', onChange: null, title: 'After baking, delete disconnected pieces whose surface area is below this % of the largest piece.' });
+    const dirty = () => this._markBakeDirty();
+    UI.slider(g, st, 'bakeRes', { label: 'Voxel res', min: 128, max: 1536, step: 32, onChange: dirty, title: 'Voxels along the longest axis. 512 is a good preview, 1024+ for final. Takes effect on Bake.' });
+    UI.slider(g, st, 'smoothIter', { label: 'Smooth', min: 0, max: 30, step: 1, onChange: dirty, title: 'Taubin smoothing passes. 0 keeps corners crisp. Takes effect on Bake.' });
+    UI.slider(g, st, 'minIslandPct', { label: 'Drop islands', min: 0, max: 20, step: 0.05, unit: '%', onChange: dirty, title: 'After baking, delete disconnected pieces whose surface area is below this % of the largest piece. Takes effect on Bake.' });
+    UI.note(g, 'These only apply when you click Bake. The button lights up when the mesh is out of date.');
     this.bakeBtn = UI.buttons(g, [{ label: 'Bake mesh', primary: true, onClick: () => this.bake() }])[0];
     this.progress = document.createElement('progress');
     this.progress.max = 1; this.progress.value = 0; this.progress.style.display = 'none';
@@ -213,6 +227,7 @@ export class App3D {
     this.showBaked = false;
     this.viewSeg.set(false);
     this.bakeStats('');
+    this._clearBakeDirty();
     this.srcNote.textContent = `${result.contours.length} paths from ${result.baseName || 'image'}`;
     if (this.state.mode === 'blob') this._rasterize();
     else this._buildExtrude();
@@ -304,13 +319,30 @@ export class App3D {
       maxBulge: st.maxBulge * k,
       thinProtect: st.thinProtect,
       steps: st.steps,
-      sectionZ: st.sectionOn ? st.sectionZ : -1
+      sectionZ: st.sectionOn ? st.sectionZ : -1,
+      sectionBack: st.backOn ? st.backZ : -1
     };
   }
 
   _updatePreviewParams() {
     this.viewer.raymarch.setParams(this._pixelParams());
     this.viewer.invalidate();
+    if (this.baked) this._markBakeDirty();
+  }
+
+  /** Highlight the Bake button: the baked mesh no longer matches the settings. */
+  _markBakeDirty() {
+    if (!this.bakeBtn) return;
+    this.bakeDirty = true;
+    this.bakeBtn.classList.add('dirty');
+    this.bakeBtn.textContent = this.baked ? 'Bake mesh (changed)' : 'Bake mesh';
+  }
+
+  _clearBakeDirty() {
+    this.bakeDirty = false;
+    if (!this.bakeBtn) return;
+    this.bakeBtn.classList.remove('dirty');
+    this.bakeBtn.textContent = 'Bake mesh';
   }
 
   bake() {
@@ -325,7 +357,7 @@ export class App3D {
     this.setStatus('Baking…', 'busy');
     this.worker.postMessage({
       id, type: 'bake', sdf2d: sdfBuf, thickness: thBuf, w: this.sdf.w, h: this.sdf.h,
-      params: { ...p, resolution: this.state.bakeRes, smoothIterations: this.state.smoothIter, minIslandPct: this.state.minIslandPct, targetSize: TARGET_SIZE }
+      params: { ...p, cutFront: p.sectionZ >= 0 ? p.sectionZ : null, cutBack: p.sectionBack >= 0 ? p.sectionBack : null, resolution: this.state.bakeRes, smoothIterations: this.state.smoothIter, minIslandPct: this.state.minIslandPct, targetSize: TARGET_SIZE }
     }, thBuf ? [sdfBuf, thBuf] : [sdfBuf]);
   }
 
@@ -341,6 +373,7 @@ export class App3D {
       this.viewer.raymarch.setField(this.sdf.sdf2d, this.sdf.thickness, m.w, m.h, this.raster.bbox, TARGET_SIZE);
       this._updatePreviewParams();
       this._applyVisibility();
+      if (this.baked) this._markBakeDirty();
       this.setStatus(`Distance field ${m.w}×${m.h} in ${m.ms.toFixed(0)} ms`);
       return;
     }
@@ -358,6 +391,7 @@ export class App3D {
       this._applyVisibility();
       this.bakeBtn.disabled = false;
       this.progress.style.display = 'none';
+      this._clearBakeDirty();
       const s = m.stats;
       this.bakeStats(`grid     ${s.nx}×${s.ny}×${s.nz}\ntris     ${s.triangleCount}\nverts    ${s.vertexCount}\nislands  ${s.islandsKept} kept, ${s.islandsRemoved} dropped\ntime     ${s.ms.toFixed(0)} ms`);
       this.setStatus(`Baked ${s.triangleCount} triangles in ${s.ms.toFixed(0)} ms`);
@@ -456,6 +490,13 @@ export class App3D {
     } catch (err) {
       this.setStatus('HDR load failed: ' + err.message, 'err');
     }
+  }
+
+  _pickSvg() {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = '.svg,image/svg+xml';
+    inp.addEventListener('change', () => { const f = inp.files[0]; if (f && this.onLoadSvg) this.onLoadSvg(f); });
+    inp.click();
   }
 
   _pickHdr() {

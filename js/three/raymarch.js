@@ -46,7 +46,8 @@ uniform int   uSteps;
 uniform vec3  uColor;
 uniform float uMetal;
 uniform float uRough;
-uniform float uSectionZ;       // >= 0: clip everything above this world z (cutaway), < 0 disabled
+uniform float uSectionZ;       // >= 0: clip everything above this world z (front cut), < 0 disabled
+uniform float uSectionBack;    // >= 0: clip everything below world z = -uSectionBack (flat back), < 0 disabled
 uniform mat4  uProj;           // camera projection matrix (not provided to fragment shaders by three.js)
 uniform sampler2D uEnv;        // equirect HDR (mipmapped), used when uHasEnv == 1
 uniform int   uHasEnv;
@@ -109,9 +110,12 @@ float map(vec3 p) {
   float r = min(uRound, Hs);
   float v = roundedBox(f.r, p.z, Hs, r);
   if (uSectionZ >= 0.0) {
-    // cutaway: intersect with the half-space world z <= uSectionZ  (pixel z >= -uSectionZ/uScale)
-    float cut = (-uSectionZ / uScale) - p.z;
-    v = max(v, cut);
+    // front cut: keep world z <= uSectionZ  (pixel z >= -uSectionZ/uScale)
+    v = max(v, (-uSectionZ / uScale) - p.z);
+  }
+  if (uSectionBack >= 0.0) {
+    // back cut: keep world z >= -uSectionBack  (pixel z <= uSectionBack/uScale)
+    v = max(v, p.z - (uSectionBack / uScale));
   }
   return v;
 }
@@ -269,6 +273,7 @@ export class RaymarchPreview {
         uMetal: { value: 1 },
         uRough: { value: 0.3 },
         uSectionZ: { value: -1 },
+        uSectionBack: { value: -1 },
         uProj: { value: new THREE.Matrix4() },
         uEnv: { value: null },
         uHasEnv: { value: 0 },
@@ -353,6 +358,7 @@ export class RaymarchPreview {
     u.uThinProtect.value = p.thinProtect;
     u.uSteps.value = p.steps;
     u.uSectionZ.value = p.sectionZ ?? -1;
+    u.uSectionBack.value = p.sectionBack ?? -1;
     this.updateBounds();
   }
 

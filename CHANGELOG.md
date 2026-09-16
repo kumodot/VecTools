@@ -1,5 +1,10 @@
 # VecTools changelog
 
+## 0.4.0 (2026-09-16)
+- SVG input: drop or load an `.svg` in the Vectorize tab, in the 3D tab (*Load SVG…* or drop on the viewport), or via the file picker. The browser rasterizes it (*SVG raster* slider, default 2048 px, coverage-based so fill colour does not matter) and it runs through the normal pipeline, landing in the 3D tab directly. The vector stays editable in the Vectorize tab.
+- Cut front / Cut back: two independent flat cuts from the mid plane, applied to the raymarch preview AND the baked mesh (closed flat faces). Cut back at 0 = relief with a flat base for 3D printing.
+- Bake button lights up (pulsing orange, "Bake mesh (changed)") whenever the baked mesh is out of date: voxel res, smooth, drop islands, or any blob/cut change after a bake.
+
 ## 0.3.0 (2026-09-16)
 - First public release on GitHub.
 - `index.html` redirect for static hosting; `hdr/index.json` merged with the folder scan.
