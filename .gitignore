@@ -1,0 +1,12 @@
+# OS / editor noise
+Thumbs.db
+.DS_Store
+desktop.ini
+*.log
+node_modules/
+# local scratch
+_scratch/
+*.tmp
+# one-off release helpers
+_git_first_release.bat
+_commit_msg.txt

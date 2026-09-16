@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+*.exr binary
+*.hdr binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.stl binary
+*.ply binary

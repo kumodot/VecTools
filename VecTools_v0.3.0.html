@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VecTools</title>
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+</head>
+<body>
+  <div id="topbar">
+    <div class="brand">Vec<span>Tools</span></div>
+    <div class="version">v0.0.0</div>
+    <div id="tabs">
+      <button data-tab="trace" class="active">1 · Vectorize</button>
+      <button data-tab="three">2 · 3D</button>
+    </div>
+    <div class="spacer"></div>
+    <div id="status" class="status"></div>
+    <button id="loadBtn" class="btn small" title="Load a .vtools project (2D + 3D settings)">Load project</button>
+    <button id="saveBtn" class="btn small" title="Save all settings as a .vtools file">Save project</button>
+    <button id="aboutBtn" class="btn small">About</button>
+  </div>
+
+  <div id="main">
+    <!-- Tab 1: image -> vector -->
+    <section class="page active" data-tab="trace">
+      <aside class="sidebar" id="traceSidebar"></aside>
+      <div class="stage" id="traceStage">
+        <canvas id="traceCanvas"></canvas>
+        <div class="hint" id="traceHint">Drop an image here<br><small>black &amp; white artwork works best</small></div>
+      </div>
+    </section>
+
+    <!-- Tab 2: vector -> 3D -->
+    <section class="page" data-tab="three">
+      <aside class="sidebar" id="threeSidebar"></aside>
+      <div class="stage" id="threeStage">
+        <canvas id="threeCanvas"></canvas>
+        <div class="hint" id="threeHint">Trace an image first, then come back here.</div>
+      </div>
+    </section>
+  </div>
+
+  <div class="modal" id="about">
+    <div class="card">
+      <button class="btn close">✕</button>
+      <h2>Vec<span>Tools</span> <span class="version">v0.0.0</span></h2>
+      <p>Image → clean vector → extruded or inflated 3D mesh. Runs fully local in your browser.</p>
+      <p><b>Marcelo Souza / Kumodot.art - 2026 // @Msouza3d</b></p>
+      <p>Support: <a href="https://ko-fi.com/msouza3d" target="_blank" rel="noopener">Support Marcelo Souza on Ko-fi</a></p>
+      <p style="font-size:11px">
+        Vectorize: threshold (Otsu), morphology, component despeckle, marching squares with hole nesting,
+        corner-aware Chaikin + RDP, Schneider Bézier fit. 3D: bevel extrude (Three.js), SDF rounded slab / dome
+        profiles from an exact Euclidean distance transform, GPU raymarch preview, marching cubes bake, Taubin smoothing.
+        HDR/EXR environments (drop files in <code>hdr/</code>), bloom, supersampled AA, transparent PNG capture, <code>.vtools</code> projects.
+      </p>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+  <script>
+    // hide the drop hint once an image is loaded
+    window.addEventListener('load', () => {
+      const obs = new MutationObserver(() => {
+        const s = document.querySelector('#status');
+        if (s && /Traced/.test(s.textContent)) document.querySelector('#traceHint').style.display = 'none';
+      });
+      obs.observe(document.querySelector('#status'), { childList: true, characterData: true, subtree: true });
+    });
+  </script>
+</body>
+</html>
