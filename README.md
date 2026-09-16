@@ -1,11 +1,26 @@
+<h1 align="center">VecTools</h1>
+
+<p align="center">
+  <a href="https://github.com/kumodot/VecTools/releases/latest"><img alt="version" src="https://img.shields.io/github/v/release/kumodot/VecTools?label=version&color=2ea44f"></a>
+  <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-1f6feb"></a>
+  <img alt="platform" src="https://img.shields.io/badge/platform-Browser%20%7C%20Windows%20%7C%20macOS%20%7C%20Linux-555">
+  <img alt="stack" src="https://img.shields.io/badge/stack-vanilla%20JS%20%2B%20three.js%2C%20no%20build-8a63d2">
+</p>
+
+<p align="center">
+  <a href="https://kumodot.github.io/VecTools/"><img alt="Run online" src="https://img.shields.io/badge/%E2%96%B6%20RUN%20VECTOOLS%20ONLINE-no%20install-2bd4c4?style=for-the-badge&labelColor=1e2024"></a>
+  &nbsp;
+  <a href="https://github.com/kumodot/VecTools/releases/latest"><img alt="Download" src="https://img.shields.io/badge/%E2%AC%87%20DOWNLOAD%20LATEST%20ZIP-run%20local-ffb347?style=for-the-badge&labelColor=1e2024"></a>
+  &nbsp;
+  <a href="https://ko-fi.com/msouza3d"><img alt="Ko-fi" src="https://img.shields.io/badge/%E2%98%95%20SUPPORT%20ON%20KO--FI-thanks!-ff5f8a?style=for-the-badge&labelColor=1e2024"></a>
+</p>
+
 <p align="center"><img src="screenshots/vectools_banner.png" alt="VecTools" width="100%"></p>
 
-# VecTools
-
 **Image → clean vector → 3D mesh.**
-Drop a black & white logo or lettering, tune the trace, then inflate it into a "chocolate bar / Wonka" style rounded mesh with a realtime preview, and export STL / OBJ / PLY for Blender, Houdini or your slicer.
+Drop a black & white logo or lettering (or your own SVG), tune the trace, then inflate it into a "chocolate bar / Wonka" style rounded mesh with a realtime preview, and export STL / OBJ / PLY for Blender, Houdini or your slicer.
 
-Single-page web app, no build step, no server side, nothing leaves your machine.
+Single-page web app, no build step, no server side, nothing leaves your machine. Runs online at the link above or fully offline from the zip.
 
 **Marcelo Souza / Kumodot.art - 2026 // @Msouza3d**
 If this saves you time: [Support Marcelo Souza on Ko-fi](https://ko-fi.com/msouza3d)
