@@ -22,7 +22,7 @@ The lettering above is `Samples/VecTools_Sample.jpg` traced and inflated with th
 
 ## Run it
 
-**Local (recommended):** download / clone, double-click `RUN_VecTools_v0.4.0.bat`. It starts `python -m http.server` on port 8765 and opens the app. Python 3 required (ES modules and Web Workers do not load from `file://`). On macOS/Linux: `python3 -m http.server 8765` in the folder, then open `http://localhost:8765/`.
+**Local (recommended):** download / clone, double-click `RUN_VecTools_v0.4.1.bat`. It starts `python -m http.server` on port 8765 and opens the app. Python 3 required (ES modules and Web Workers do not load from `file://`). On macOS/Linux: `python3 -m http.server 8765` in the folder, then open `http://localhost:8765/`.
 
 **Hosted:** it is a static site, so any static host works. `index.html` redirects to the current versioned entry file.
 
@@ -50,7 +50,7 @@ Try it with the images in `Samples/`. Already have a vector? Drop an `.svg` on e
 - **Render**: supersampled anti-aliasing, glow, wireframe, flat shading, floor grid.
 - **Navigation**: Orbit or Fly (W/A/S/D + mouse look, pointer lock), *Laziness* eases the camera.
 - **Capture PNG** at 1x-4x, optionally transparent.
-- Export **STL**, **OBJ**, **PLY**. Units: longest side = 100, rescale in your 3D app.
+- Export **STL**, **OBJ**, **PLY**. Units: longest side = 100, or set *Export size (mm)* to get the longest side in millimetres directly.
 
 ### Projects
 *Save project* writes a `.vtools` JSON with every 2D + 3D setting. *Load project* (or drop the file on the app) re-applies them to whatever image is loaded.
@@ -62,7 +62,8 @@ Try it with the images in `Samples/`. Already have a vector? Drop an `.svg` on e
 
 ## Layout
 ```
-index.html               static-host entry (redirects to the versioned app)
+index.html               static-host entry (reads version.json, redirects to the versioned app)
+version.json             current version + entry file (edit on every bump)
 VecTools_vX.Y.Z.html     the app (version in the file name and header)
 RUN_VecTools_vX.Y.Z.bat  local launcher
 js/                      app code (trace/ = vectorize pipeline, three/ = 3D pipeline)

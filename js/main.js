@@ -5,6 +5,7 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.4.1  Export size (mm): optional uniform scale on STL/OBJ/PLY export.
  *  0.4.0  SVG input: drop / load an .svg in either tab, it is rasterized by
  *         the browser (SVG raster slider) and goes through the same pipeline,
  *         so it lands in the 3D tab directly. Cut front / Cut back applied to
@@ -24,7 +25,7 @@
 import { TraceApp } from './appTrace.js';
 import { App3D } from './app3d.js';
 
-export const APP_VERSION = '0.4.0';
+export const APP_VERSION = '0.4.1';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 

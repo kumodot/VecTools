@@ -52,6 +52,7 @@ export class App3D {
       wire: false, flat: false, grid: true,
       // capture
       captureScale: 2, captureTransparent: true,
+      exportSizeMm: 0,
       // navigation
       navMode: 'orbit', laziness: 0.5, flySpeed: 60, hidePointer: false
     };
@@ -180,7 +181,8 @@ export class App3D {
       { label: 'OBJ', onClick: () => this.export('obj') },
       { label: 'PLY', onClick: () => this.export('ply') }
     ]);
-    UI.note(g, 'Blob mode exports the baked mesh. Units: longest side = 100.');
+    UI.slider(g, st, 'exportSizeMm', { label: 'Export size', min: 0, max: 500, step: 1, unit: 'mm', title: 'Longest side of the exported mesh in mm. 0 keeps the internal units (longest side = 100). STL has no unit, slicers and Blender read it as mm.' });
+    UI.note(g, 'Blob mode exports the baked mesh. Export size 0 = longest side 100 units; otherwise the longest side becomes that many mm.');
   }
 
   _applyProfile() {
@@ -547,9 +549,20 @@ export class App3D {
   // ------------------------------------------------------------------ export
   export(kind) {
     if (this.state.mode === 'blob' && !this.baked) return this.setStatus('Bake the mesh first.', 'err');
-    const a = this.viewer.exportArrays();
+    let a = this.viewer.exportArrays();
     if (!a) return this.setStatus('Nothing to export.', 'err');
-    const name = `${this.baseName}_${this.state.mode === 'blob' ? this.state.profile : 'extrude'}`;
+    const mm = this.state.exportSizeMm;
+    if (mm > 0) {
+      // uniform scale so the longest xy side equals `mm` (STL/OBJ/PLY carry no unit; readers assume mm)
+      const p = a.positions;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (let i = 0; i < p.length; i += 3) { if (p[i] < minX) minX = p[i]; if (p[i] > maxX) maxX = p[i]; if (p[i + 1] < minY) minY = p[i + 1]; if (p[i + 1] > maxY) maxY = p[i + 1]; }
+      const k = mm / Math.max(maxX - minX, maxY - minY, 1e-9);
+      const scaled = new Float32Array(p.length);
+      for (let i = 0; i < p.length; i++) scaled[i] = p[i] * k;
+      a = { ...a, positions: scaled };
+    }
+    const name = `${this.baseName}_${this.state.mode === 'blob' ? this.state.profile : 'extrude'}${mm > 0 ? '_' + mm + 'mm' : ''}`;
     let blob, ext;
     if (kind === 'stl') { blob = new Blob([toSTLBinary(a.positions, a.indices, 'VecTools')], { type: 'model/stl' }); ext = 'stl'; }
     else if (kind === 'obj') { blob = new Blob([toOBJ(a.positions, a.indices, a.normals, name)], { type: 'text/plain' }); ext = 'obj'; }

@@ -1,5 +1,9 @@
 # VecTools changelog
 
+## 0.4.1 (2026-09-16)
+- *Export size (mm)* in the Export group: 0 keeps the internal units (longest side = 100), otherwise the exported STL/OBJ/PLY is scaled so its longest side is that many mm. File name gets a `_<mm>mm` suffix.
+- `index.html` now reads `version.json` (no-store) before redirecting, so a cached index on GitHub Pages can no longer point at a removed build.
+
 ## 0.4.0 (2026-09-16)
 - SVG input: drop or load an `.svg` in the Vectorize tab, in the 3D tab (*Load SVG…* or drop on the viewport), or via the file picker. The browser rasterizes it (*SVG raster* slider, default 2048 px, coverage-based so fill colour does not matter) and it runs through the normal pipeline, landing in the 3D tab directly. The vector stays editable in the Vectorize tab.
 - Cut front / Cut back: two independent flat cuts from the mid plane, applied to the raymarch preview AND the baked mesh (closed flat faces). Cut back at 0 = relief with a flat base for 3D printing.
