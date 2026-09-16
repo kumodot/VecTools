@@ -1,3 +1,5 @@
+<p align="center"><img src="screenshots/vectools_banner.png" alt="VecTools" width="100%"></p>
+
 # VecTools
 
 **Image → clean vector → rounded 3D mesh, in your browser.**
@@ -8,7 +10,15 @@ Single-page web app, no build step, no server side, nothing leaves your machine.
 **Marcelo Souza / Kumodot.art - 2026 // @Msouza3d**
 If this saves you time: [Support Marcelo Souza on Ko-fi](https://ko-fi.com/msouza3d)
 
-<!-- screenshots: see the screenshots/ folder -->
+**Try it now:** [kumodot.github.io/VecTools](https://kumodot.github.io/VecTools/)
+
+## Screenshots
+
+| Vectorize | Extrude | Blob / Inflate |
+|---|---|---|
+| ![Vectorize tab](screenshots/VTools_SVG.jpg) | ![Extrude mode](screenshots/VTools_Extrude.jpg) | ![Blob mode](screenshots/VTools_BULGE.jpg) |
+
+The lettering above is `Samples/VecTools_Sample.jpg` traced and inflated with the *Local-width dome* profile, lit by one of the bundled EXRs.
 
 ## Run it
 
@@ -58,6 +68,7 @@ js/                      app code (trace/ = vectorize pipeline, three/ = 3D pipe
 vendor/                  three.js + addons (vendored, no build step)
 hdr/                     environment maps + index.json
 Samples/                 test images
+screenshots/             README images + share banner
 docs/                    self-tests, release notes
 ```
 
