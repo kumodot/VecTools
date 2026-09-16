@@ -2,7 +2,7 @@
 
 # VecTools
 
-**Image → clean vector → rounded 3D mesh, in your browser.**
+**Image → clean vector → 3D mesh.**
 Drop a black & white logo or lettering, tune the trace, then inflate it into a "chocolate bar / Wonka" style rounded mesh with a realtime preview, and export STL / OBJ / PLY for Blender, Houdini or your slicer.
 
 Single-page web app, no build step, no server side, nothing leaves your machine.
