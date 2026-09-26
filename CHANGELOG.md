@@ -1,5 +1,12 @@
 # VecTools changelog
 
+## 0.7.0 (2026-09-26)
+- **Print plate** (3D tab, Blob mode): backing plate behind the body as a separate part for two-colour printing. Shapes: *Contour* (silhouette + margin; *Bridge gaps* closes gaps narrower than 2x the value so letters share one plate while big empty areas stay open), *Convex hull*, *Box* (corner radius). *Fill holes* / *Min hole*, *Thickness*, *Embed* (overlap into the body), *Edge round*, *Color*. Stats: pieces, holes, triangles, area and volume (with Export size).
+- **Export > Print (body + plate .zip)**: `<name>_body.stl` + `<name>_plate.stl` with shared coordinates and a README, ready for "load as a single object with multiple parts" in Bambu Studio / OrcaSlicer. Export size (mm) applies to the whole assembly.
+- Turning the plate on enables *Cut back*, so the body sits flat on the plate top.
+- Preview, bake and plate now share one pixel-to-world frame: the baked mesh is no longer re-centred on its own bounding box, so it lands exactly where the preview shows it.
+- Fix: bake cut depths (*Front height* / *Back depth*) were applied in pixel units instead of world units, so the baked cuts were much shallower than the preview.
+
 ## 0.6.1 (2026-09-26)
 - Bake workflow: changing any shape setting (Blob, cuts, raster) while *Baked mesh* is on screen now switches the view back to the live *Preview*, so the change is visible immediately. The previous bake stays in memory as *Baked mesh (old)* (still viewable and exportable) until you Bake again. Bake-only settings (Voxel res, Smooth, Drop islands) keep the current view and just light up the button.
 

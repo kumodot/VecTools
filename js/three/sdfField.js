@@ -385,12 +385,31 @@ export function buildField(opts) {
  *                   maxX: number, maxY: number, maxZ: number}}} meta
  *   The object returned by buildField().
  * @param {number} targetSize  Desired longest xy dimension in world units.
+ * @param {{cx: number, cy: number, s: number}|null} [frame]  Fixed pixel -> world
+ *   frame: world = ((px - cx) * s, -(py - cy) * s, -pz * s). When given, the
+ *   mesh is NOT re-centred on its own bbox, so it lands exactly where the
+ *   raymarch preview and the print plate put it (same frame). Without it the
+ *   legacy behaviour applies: centre on the mesh bbox, longest xy = targetSize.
  * @returns {Float32Array} A NEW array of world-space positions.
  */
-export function gridToWorld(positions, meta, targetSize) {
+export function gridToWorld(positions, meta, targetSize, frame = null) {
   const n = (positions.length / 3) | 0;
   const out = new Float32Array(positions.length);
   const { scale, zScale, bounds } = meta;
+
+  if (frame) {
+    const { cx, cy, s } = frame;
+    for (let v = 0; v < n; v++) {
+      const i3 = v * 3;
+      const px = bounds.minX + positions[i3] * scale;
+      const py = bounds.minY + positions[i3 + 1] * scale;
+      const pz = bounds.minZ + positions[i3 + 2] * zScale;
+      out[i3] = (px - cx) * s;
+      out[i3 + 1] = -(py - cy) * s;
+      out[i3 + 2] = -pz * s;
+    }
+    return out;
+  }
 
   let minX = Infinity, minY = Infinity, minZ = Infinity;
   let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;

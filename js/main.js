@@ -5,6 +5,10 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.7.0  Print plate: backing plate as a separate part (Contour with gap
+ *         bridging / hollow areas, Convex hull, Box), Export > Print zip with
+ *         body + plate STL in shared coordinates. Shared pixel-to-world frame
+ *         for preview, bake and plate. Fix: bake cut depths were in px.
  *  0.6.1  Changing a shape setting while the baked mesh is on screen now flips
  *         the view back to the live preview; the old bake stays available as
  *         "Baked mesh (old)" until the next Bake.
@@ -33,7 +37,7 @@
 import { TraceApp } from './appTrace.js';
 import { App3D } from './app3d.js';
 
-export const APP_VERSION = '0.6.1';
+export const APP_VERSION = '0.7.0';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 

@@ -9,11 +9,17 @@
  * World units: the longest xy extent of the artwork is TARGET_SIZE (100).
  * Every thickness/radius slider is in those units, and gets converted to
  * raster pixels for the SDF worker and shader.
+ *
+ * Frame: preview, bake and print plate all share one pixel -> world mapping
+ * (`_frame()`), so the baked body and the plate line up exactly and can be
+ * exported as two separate parts for two-colour printing.
  */
 import * as UI from './ui.js';
 import { Viewer, MATERIAL_PRESETS } from './three/viewer.js';
 import { buildShapes, buildExtrudeGeometry } from './three/extrude.js';
 import { toSTLBinary, toOBJ, toPLYBinary } from './three/exporters.js';
+import { buildPlateGeometry, geometryArrays } from './three/plateGeometry.js';
+import { zipSync } from 'three/addons/libs/fflate.module.js';
 
 const TARGET_SIZE = 100;
 const RASTER_MARGIN = 6;
@@ -32,6 +38,8 @@ export class App3D {
     this.sdf = null;         // { sdf2d, thickness, w, h }
     this.baked = null;       // { positions, indices, normals, stats }
     this.showBaked = false;
+    this.plate = null;       // { contours, stats } from the worker (pixel space)
+    this.plateReqId = 0;
     this.baseName = 'model';
 
     this.state = {
@@ -44,6 +52,9 @@ export class App3D {
       thickByWidth: 0, widthRef: 0, widthFloor: 0.15, widthPow: 1,
       steps: 160, sectionOn: false, sectionZ: 0, backOn: false, backZ: 0,
       bakeRes: 512, smoothIter: 3, minIslandPct: 0,
+      // print plate (world units), a separate part behind the body
+      plateOn: false, plateShape: 'contour', plateMargin: 4, plateBridge: 0, plateCorner: 5,
+      plateFill: false, plateMinHole: 2, plateThick: 2, plateEmbed: 0.3, plateBevel: 0, plateColor: '#3a3f47',
       // environment
       hdr: '', hdrBackground: false, hdrBlur: 0, envRotation: 0, envSpin: false, envSpinSpeed: 20, envIntensity: 1, exposure: 1,
       // material
@@ -60,6 +71,7 @@ export class App3D {
     this.hdrFiles = [];
     this.rebuildExtrude = UI.debounce(() => this._buildExtrude(), 60);
     this.rebuildRaster = UI.debounce(() => this._rasterize(), 120);
+    this.rebuildPlate = UI.debounce(() => this._requestPlate(), 150);
     this._buildUI();
     this._applyMode();
     this._applyEnvironment();
@@ -119,6 +131,25 @@ export class App3D {
     UI.slider(g, st, 'sectionZ', { label: 'Front height', min: 0, max: 20, step: 0.05, onChange: bl });
     UI.checkbox(g, st, 'backOn', { label: 'Cut back', onChange: bl, title: 'Flat back face: everything below this depth (from the mid plane) is removed. 0 = relief with a flat base, ready for 3D printing. Applies to the preview and the bake.' });
     UI.slider(g, st, 'backZ', { label: 'Back depth', min: 0, max: 20, step: 0.05, onChange: bl });
+
+    // --- print plate ---
+    this.gPlate = UI.group(sb, 'Print plate');
+    g = this.gPlate;
+    const pl = () => this.rebuildPlate();          // outline changes: worker
+    const pg = () => this._buildPlateGeometry();   // slab changes: geometry only
+    UI.checkbox(g, st, 'plateOn', { label: 'Plate', onChange: () => this._applyPlateOn(), title: 'Backing plate behind the body, as a SEPARATE part (pick its own filament in the slicer). Turns on Cut back so the body sits flat on it.' });
+    this.rowPlateShape = UI.select(g, st, 'plateShape', { label: 'Shape', options: [['contour', 'Contour (follows the art)'], ['hull', 'Convex hull'], ['box', 'Box']], onChange: () => { this._applyPlateRows(); pl(); } });
+    this.rowPlateMargin = UI.slider(g, st, 'plateMargin', { label: 'Margin', min: 0, max: 30, step: 0.1, onChange: pl, title: 'How far the plate extends beyond the artwork.' });
+    this.rowPlateBridge = UI.slider(g, st, 'plateBridge', { label: 'Bridge gaps', min: 0, max: 40, step: 0.1, onChange: pl, title: 'Closes gaps narrower than 2x this (letters share one plate) while large empty areas stay open: a hollow plate that saves filament. 0 = plain outline.' });
+    this.rowPlateCorner = UI.slider(g, st, 'plateCorner', { label: 'Corner radius', min: 0, max: 30, step: 0.1, onChange: pl });
+    this.rowPlateFill = UI.checkbox(g, st, 'plateFill', { label: 'Fill holes', onChange: () => { this._applyPlateRows(); pl(); }, title: 'Solid plate: every enclosed pocket is filled.' });
+    this.rowPlateMinHole = UI.slider(g, st, 'plateMinHole', { label: 'Min hole', min: 0, max: 20, step: 0.1, unit: '%', onChange: pl, title: 'Pockets smaller than this % of the plate area are filled, so the plate is not peppered with tiny holes.' });
+    UI.slider(g, st, 'plateThick', { label: 'Thickness', min: 0.2, max: 20, step: 0.05, onChange: pg });
+    UI.slider(g, st, 'plateEmbed', { label: 'Embed', min: 0, max: 3, step: 0.05, onChange: pg, title: 'How deep the plate top sinks into the body (overlap), so the two parts fuse in the slicer. 0 = touching.' });
+    UI.slider(g, st, 'plateBevel', { label: 'Edge round', min: 0, max: 3, step: 0.05, onChange: pg, title: 'Rounds the plate edges (top and bottom).' });
+    UI.color(g, st, 'plateColor', { label: 'Color', onChange: () => this.viewer.setPlateColor(st.plateColor) });
+    this.plateStats = UI.stats(g);
+    UI.note(g, 'The plate is a separate part: Export > Print writes body + plate STL (same coordinates) in one zip. In Bambu Studio import both and accept "load as a single object with multiple parts".');
 
     this.gBake = UI.group(sb, 'Bake mesh');
     g = this.gBake;
@@ -192,7 +223,8 @@ export class App3D {
       { label: 'OBJ', onClick: () => this.export('obj') },
       { label: 'PLY', onClick: () => this.export('ply') }
     ]);
-    UI.slider(g, st, 'exportSizeMm', { label: 'Export size', min: 0, max: 500, step: 1, unit: 'mm', title: 'Longest side of the exported mesh in mm. 0 keeps the internal units (longest side = 100). STL has no unit, slicers and Blender read it as mm.' });
+    this.printBtn = UI.buttons(g, [{ label: 'Print (body + plate .zip)', onClick: () => this.exportPrint(), title: 'Zip with <name>_body.stl and <name>_plate.stl in the same coordinates, ready for a two-colour print.' }])[0];
+    UI.slider(g, st, 'exportSizeMm', { label: 'Export size', min: 0, max: 500, step: 1, unit: 'mm', onChange: () => { if (this.viewer.plateMesh) this._updatePlateStats(this.viewer.plateMesh.geometry); }, title: 'Longest side of the exported mesh in mm. 0 keeps the internal units (longest side = 100). STL has no unit, slicers and Blender read it as mm.' });
     UI.note(g, 'Blob mode exports the baked mesh. Export size 0 = longest side 100 units; otherwise the longest side becomes that many mm.');
   }
 
@@ -210,7 +242,10 @@ export class App3D {
     this.gExtrude.parentElement.style.display = blob ? 'none' : '';
     this.gBlob.parentElement.style.display = blob ? '' : 'none';
     this.gBake.parentElement.style.display = blob ? '' : 'none';
+    this.gPlate.parentElement.style.display = blob ? '' : 'none';
     this._applyProfile();
+    this._applyPlateRows();
+    this.viewer.setPlateVisible(blob && this.state.plateOn);
     if (blob) {
       this.viewer.clearMesh();
       if (this.baked) this.viewer.setMeshArrays(this.baked.positions, this.baked.indices, this.baked.normals);
@@ -243,6 +278,9 @@ export class App3D {
     this.viewSeg.set(false);
     this.bakeStats('');
     this._clearBakeDirty();
+    this.plate = null;
+    this.viewer.setPlateGeometry(null);
+    this.plateStats('');
     this.srcNote.textContent = `${result.contours.length} paths from ${result.baseName || 'image'}`;
     if (this.state.mode === 'blob') this._rasterize();
     else this._buildExtrude();
@@ -313,6 +351,83 @@ export class App3D {
     for (let i = 0, n = w * h; i < n; i++) mask[i] = data[i * 4 + 3] > 127 ? 1 : 0;
     this.raster = { mask, w, h, bbox: { minX: m, minY: m, maxX: w - m, maxY: h - m }, pxPerUnit: st.rasterRes / TARGET_SIZE };
     this._requestSDF();
+    this._requestPlate();
+  }
+
+  /** Shared pixel -> world frame: world = ((px - cx) * s, -(py - cy) * s, -pz * s). */
+  _frame() {
+    if (!this.raster) return null;
+    const b = this.raster.bbox;
+    const longest = Math.max(b.maxX - b.minX, b.maxY - b.minY, 1e-6);
+    return { cx: (b.minX + b.maxX) / 2, cy: (b.minY + b.maxY) / 2, s: TARGET_SIZE / longest };
+  }
+
+  // ------------------------------------------------------------------ print plate
+  _applyPlateOn() {
+    const st = this.state;
+    if (st.plateOn && !st.backOn) UI.applyState(st, { backOn: true }); // flat back so the body sits on the plate
+    this._applyPlateRows();
+    this._updatePreviewParams();
+    this.viewer.setPlateVisible(st.mode === 'blob' && st.plateOn);
+    if (st.plateOn && !this.plate) this._requestPlate();
+  }
+
+  _applyPlateRows() {
+    const st = this.state, on = st.plateOn;
+    const contour = st.plateShape === 'contour', box = st.plateShape === 'box';
+    const rows = [this.rowPlateShape, this.rowPlateMargin, this.rowPlateBridge, this.rowPlateCorner, this.rowPlateFill, this.rowPlateMinHole];
+    for (const r of rows) if (r && r.setDisabled) r.setDisabled(!on);
+    if (on) {
+      this.rowPlateBridge.setDisabled(!contour);
+      this.rowPlateCorner.setDisabled(!box);
+      this.rowPlateFill.setDisabled(box);
+      this.rowPlateMinHole.setDisabled(box || st.plateFill);
+    }
+  }
+
+  /** Ask the worker for the plate outline (pixel space) from the current raster. */
+  _requestPlate() {
+    const st = this.state;
+    if (!st.plateOn || !this.raster || st.mode !== 'blob') return;
+    const r = this.raster, k = r.pxPerUnit;
+    const id = ++this.plateReqId;
+    const buf = r.mask.slice().buffer;
+    this.worker.postMessage({
+      id, type: 'plate', mask: buf, w: r.w, h: r.h,
+      params: { shape: st.plateShape, margin: st.plateMargin * k, bridge: st.plateBridge * k, cornerRadius: st.plateCorner * k, fillHoles: st.plateFill, minHolePct: st.plateMinHole }
+    }, [buf]);
+  }
+
+  /** World z of the plate's top face: the body's back plane plus the embed. */
+  _plateTop() {
+    const st = this.state;
+    return -st.backZ + st.plateEmbed;
+  }
+
+  _buildPlateGeometry() {
+    const st = this.state;
+    if (!this.plate || !st.plateOn) { this.viewer.setPlateGeometry(null); return; }
+    const frame = this._frame();
+    if (!frame) return;
+    const geo = buildPlateGeometry(this.plate.contours, frame, { thickness: st.plateThick, zTop: this._plateTop(), bevel: st.plateBevel, bevelSegments: 3 });
+    this.viewer.setPlateGeometry(geo);
+    this.viewer.setPlateVisible(st.mode === 'blob' && st.plateOn);
+    this._updatePlateStats(geo);
+  }
+
+  _updatePlateStats(geo) {
+    const st = this.state, s = this.plate ? this.plate.stats : null;
+    if (!s || !geo) { this.plateStats(''); return; }
+    const frame = this._frame();
+    const areaU = s.areaPx * frame.s * frame.s; // world units^2
+    const mm = st.exportSizeMm > 0 ? this._exportScale() : 0;
+    const tris = (geo.getIndex() ? geo.getIndex().count : geo.getAttribute('position').count) / 3;
+    let line = `pieces   ${s.islands}   holes ${s.holes}\ntris     ${tris.toFixed(0)}`;
+    if (mm > 0) {
+      const areaMm = areaU * mm * mm, volCm3 = areaMm * st.plateThick * mm / 1000;
+      line += `\narea     ${(areaMm / 100).toFixed(1)} cm²   volume ${volCm3.toFixed(1)} cm³`;
+    } else line += `\narea     ${areaU.toFixed(0)} u²  (set Export size for cm³)`;
+    this.plateStats(line);
   }
 
   _requestSDF() {
@@ -340,13 +455,14 @@ export class App3D {
       maxThickness: this.sdf ? this.sdf.maxThickness : 0,
       steps: st.steps,
       sectionZ: st.sectionOn ? st.sectionZ : -1,
-      sectionBack: st.backOn ? st.backZ : -1
+      sectionBack: (st.backOn || st.plateOn) ? st.backZ : -1
     };
   }
 
   _updatePreviewParams() {
     this.viewer.raymarch.setParams(this._pixelParams());
     this.viewer.invalidate();
+    if (this.plate && this.state.plateOn) this._buildPlateGeometry(); // plate top follows the back cut
     // A shape change while the baked mesh is on screen would be invisible:
     // flip back to the live preview so the change shows right away. The old
     // bake stays in memory (still exportable) until the next Bake.
@@ -388,6 +504,7 @@ export class App3D {
     if (!this.sdf) return this.setStatus('No distance field yet.', 'err');
     const id = ++this.reqId;
     const p = this._pixelParams();
+    const k = this.raster.pxPerUnit; // cut depths are world units in p; the field wants pixels (the shader converts with uScale)
     const sdfBuf = this.sdf.sdf2d.slice().buffer;
     const thBuf = this.sdf.thickness ? this.sdf.thickness.slice().buffer : null;
     this.bakeBtn.disabled = true;
@@ -396,7 +513,7 @@ export class App3D {
     this.setStatus('Baking…', 'busy');
     this.worker.postMessage({
       id, type: 'bake', sdf2d: sdfBuf, thickness: thBuf, w: this.sdf.w, h: this.sdf.h,
-      params: { ...p, cutFront: p.sectionZ >= 0 ? p.sectionZ : null, cutBack: p.sectionBack >= 0 ? p.sectionBack : null, resolution: this.state.bakeRes, smoothIterations: this.state.smoothIter, minIslandPct: this.state.minIslandPct, targetSize: TARGET_SIZE }
+      params: { ...p, cutFront: p.sectionZ >= 0 ? p.sectionZ * k : null, cutBack: p.sectionBack >= 0 ? p.sectionBack * k : null, resolution: this.state.bakeRes, smoothIterations: this.state.smoothIter, minIslandPct: this.state.minIslandPct, targetSize: TARGET_SIZE, frame: this._frame() }
     }, thBuf ? [sdfBuf, thBuf] : [sdfBuf]);
   }
 
@@ -404,6 +521,12 @@ export class App3D {
     if (m.type === 'error') {
       this.setStatus('Mesh error: ' + m.message, 'err'); console.error(m.stack);
       this.bakeBtn.disabled = false; this.progress.style.display = 'none';
+      return;
+    }
+    if (m.type === 'plateResult') {
+      if (m.id !== this.plateReqId) return;
+      this.plate = { contours: m.contours.map((c) => ({ pts: new Float32Array(c.pts), level: c.level, isHole: c.isHole, area: c.area })), stats: m.stats };
+      this._buildPlateGeometry();
       return;
     }
     if (m.id !== this.reqId) return;
@@ -601,6 +724,8 @@ export class App3D {
     if (!obj) return;
     UI.applyState(this.state, obj);
     this._applyProfile();
+    this._applyPlateRows();
+    this.viewer.setPlateColor(this.state.plateColor);
     this._applyEnvironment();
     this.scanHdrFolder().then(() => this._applyHdrSelection());
     this._updatePreviewParams();
@@ -609,6 +734,64 @@ export class App3D {
   }
 
   // ------------------------------------------------------------------ export
+  /** Longest xy side (world units) over a list of position arrays. */
+  static _longestXY(arrays) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const p of arrays) {
+      if (!p) continue;
+      for (let i = 0; i < p.length; i += 3) { if (p[i] < minX) minX = p[i]; if (p[i] > maxX) maxX = p[i]; if (p[i + 1] < minY) minY = p[i + 1]; if (p[i + 1] > maxY) maxY = p[i + 1]; }
+    }
+    return Math.max(maxX - minX, maxY - minY, 1e-9);
+  }
+
+  /**
+   * World units -> mm factor for Export size. The reference extent is the
+   * body alone, or body + plate when the plate is on, so both parts of a print
+   * export share one factor and the artwork keeps the requested size.
+   */
+  _exportScale() {
+    const mm = this.state.exportSizeMm;
+    if (!(mm > 0)) return 1;
+    const arrays = [];
+    const body = this.viewer.exportArrays();
+    if (body) arrays.push(body.positions);
+    const plate = this.state.plateOn ? this.viewer.plateArrays() : null;
+    if (plate) arrays.push(plate.positions);
+    if (!arrays.length) return 1;
+    return mm / App3D._longestXY(arrays);
+  }
+
+  static _scaled(a, k) {
+    if (k === 1) return a;
+    const p = a.positions, scaled = new Float32Array(p.length);
+    for (let i = 0; i < p.length; i++) scaled[i] = p[i] * k;
+    return { ...a, positions: scaled };
+  }
+
+  /** Two-colour print: body + plate as separate STL files in one zip, same coordinates. */
+  exportPrint() {
+    const st = this.state;
+    if (st.mode !== 'blob') return this.setStatus('Print export works in Blob mode (bake the body first).', 'err');
+    if (!this.baked) return this.setStatus('Bake the mesh first.', 'err');
+    if (!st.plateOn || !this.viewer.plateArrays()) return this.setStatus('Turn on the Print plate first.', 'err');
+    const k = this._exportScale();
+    const body = App3D._scaled(this.viewer.exportArrays(), k);
+    const plate = App3D._scaled(this.viewer.plateArrays(), k);
+    const mm = st.exportSizeMm;
+    const base = `${this.baseName}_${st.profile}${mm > 0 ? '_' + mm + 'mm' : ''}`;
+    const files = {};
+    files[`${base}_body.stl`] = new Uint8Array(toSTLBinary(body.positions, body.indices, 'VecTools body'));
+    files[`${base}_plate.stl`] = new Uint8Array(toSTLBinary(plate.positions, plate.indices, 'VecTools plate'));
+    files['README.txt'] = new TextEncoder().encode(
+      `VecTools print export\n\n${base}_body.stl  - the artwork\n${base}_plate.stl - the backing plate\n\n` +
+      'Both files share the same coordinates. In Bambu Studio / OrcaSlicer import both at once and answer YES to ' +
+      '"load these files as a single object with multiple parts", then assign a filament to each part.\n' +
+      (mm > 0 ? `Scale: longest side = ${mm} mm.\n` : 'Scale: internal units (longest side = 100). Set Export size (mm) for real dimensions.\n'));
+    const zip = zipSync(files, { level: 6 });
+    UI.download(new Blob([zip], { type: 'application/zip' }), `${base}_print.zip`);
+    this.setStatus(`Print export: ${base}_print.zip (body + plate).`);
+  }
+
   export(kind) {
     if (this.state.mode === 'blob' && !this.baked) return this.setStatus('Bake the mesh first.', 'err');
     let a = this.viewer.exportArrays();
@@ -616,13 +799,7 @@ export class App3D {
     const mm = this.state.exportSizeMm;
     if (mm > 0) {
       // uniform scale so the longest xy side equals `mm` (STL/OBJ/PLY carry no unit; readers assume mm)
-      const p = a.positions;
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      for (let i = 0; i < p.length; i += 3) { if (p[i] < minX) minX = p[i]; if (p[i] > maxX) maxX = p[i]; if (p[i + 1] < minY) minY = p[i + 1]; if (p[i + 1] > maxY) maxY = p[i + 1]; }
-      const k = mm / Math.max(maxX - minX, maxY - minY, 1e-9);
-      const scaled = new Float32Array(p.length);
-      for (let i = 0; i < p.length; i++) scaled[i] = p[i] * k;
-      a = { ...a, positions: scaled };
+      a = App3D._scaled(a, this._exportScale());
     }
     const name = `${this.baseName}_${this.state.mode === 'blob' ? this.state.profile : 'extrude'}${mm > 0 ? '_' + mm + 'mm' : ''}`;
     let blob, ext;

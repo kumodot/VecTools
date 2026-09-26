@@ -97,6 +97,10 @@ export class Viewer {
     this.wireMaterial = new THREE.MeshBasicMaterial({ color: 0x4fc3f7, wireframe: true, transparent: true, opacity: 0.35 });
     this.mesh = null;
     this.wireMesh = null;
+    // print plate: a separate part behind the body, own colour, shares metalness/roughness with the body
+    this.plateMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3f47, metalness: 1, roughness: 0.28, envMapIntensity: 1.0, side: THREE.DoubleSide });
+    this.plateMesh = null;
+    this.plateVisible = true;
 
     this.raymarch = new RaymarchPreview();
     this.scene.add(this.raymarch.mesh);
@@ -225,6 +229,10 @@ export class Viewer {
     if (m.roughness != null) this.material.roughness = m.roughness;
     if (m.envIntensity != null) this.material.envMapIntensity = m.envIntensity;
     this.material.needsUpdate = true;
+    if (m.metalness != null) this.plateMaterial.metalness = m.metalness;
+    if (m.roughness != null) this.plateMaterial.roughness = m.roughness;
+    if (m.envIntensity != null) this.plateMaterial.envMapIntensity = m.envIntensity;
+    this.plateMaterial.needsUpdate = true;
     this.raymarch.setMaterial(this.material.color, this.material.metalness, this.material.roughness, this.material.envMapIntensity);
     this.invalidate();
   }
@@ -232,6 +240,8 @@ export class Viewer {
   setFlatShading(flat) {
     this.material.flatShading = flat;
     this.material.needsUpdate = true;
+    this.plateMaterial.flatShading = flat;
+    this.plateMaterial.needsUpdate = true;
     this.invalidate();
   }
 
@@ -364,6 +374,43 @@ export class Viewer {
     else geo.computeVertexNormals();
     if (indices) geo.setIndex(new THREE.BufferAttribute(indices, 1));
     this.setGeometry(geo);
+  }
+
+  // ------------------------------------------------------------------ print plate
+  /** Replace the plate mesh; null removes it. */
+  setPlateGeometry(geo) {
+    if (this.plateMesh) {
+      this.scene.remove(this.plateMesh);
+      this.plateMesh.geometry.dispose();
+      this.plateMesh = null;
+    }
+    if (geo) {
+      this.plateMesh = new THREE.Mesh(geo, this.plateMaterial);
+      this.plateMesh.visible = this.plateVisible;
+      this.scene.add(this.plateMesh);
+    }
+    this.invalidate();
+  }
+
+  setPlateVisible(v) {
+    this.plateVisible = !!v;
+    if (this.plateMesh) this.plateMesh.visible = this.plateVisible;
+    this.invalidate();
+  }
+
+  setPlateColor(hex) {
+    this.plateMaterial.color.set(hex);
+    this.plateMaterial.needsUpdate = true;
+    this.invalidate();
+  }
+
+  plateArrays() {
+    if (!this.plateMesh) return null;
+    const geo = this.plateMesh.geometry;
+    const pos = geo.getAttribute('position').array;
+    const idx = geo.getIndex() ? geo.getIndex().array : null;
+    const nrm = geo.getAttribute('normal') ? geo.getAttribute('normal').array : null;
+    return { positions: pos, indices: idx ? (idx instanceof Uint32Array ? idx : new Uint32Array(idx)) : null, normals: nrm };
   }
 
   setMeshVisible(v) {

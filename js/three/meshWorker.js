@@ -21,6 +21,10 @@
  *   { id, type: 'result', positions, indices, normals, stats }
  *   { id, type: 'error', message, stack }
  *
+ * Other requests: 'sdf' (mask -> 2D SDF + thickness, see handleSdf) and
+ * 'plate' (mask -> print plate contours, see handlePlate). Every plate request
+ * carries its own `id`; the main thread ignores results whose id is stale.
+ *
  * No external dependencies beyond the sibling modules in this folder.
  */
 
@@ -28,6 +32,7 @@ import { buildField, gridToWorld, PROFILES } from './sdfField.js';
 import { marchingCubes } from './marchingCubes.js';
 import { weldVertices, taubinSmooth, computeNormals } from './smooth.js';
 import { signedDistanceField, localThickness } from './edt.js';
+import { buildPlate } from './plate.js';
 
 /**
  * Current high-resolution time in milliseconds.
@@ -169,7 +174,7 @@ function handleBake(msg) {
     progress('smooth', 1);
   }
 
-  const world = gridToWorld(smoothed, meta, targetSize);
+  const world = gridToWorld(smoothed, meta, targetSize, params.frame || null);
   const normals = computeNormals(world, welded.indices);
 
   const ms = now() - t0;
@@ -266,12 +271,32 @@ function handleSdf(msg) {
   );
 }
 
+/**
+ * Build the print plate outline for a mask.
+ *
+ * Incoming: { id, type: 'plate', mask: ArrayBuffer (Uint8 0/1, w*h), w, h, params }
+ *           params: see buildPlate() (pixel units)
+ * Outgoing: { id, type: 'plateResult', contours: [{pts: ArrayBuffer, level, isHole, area}], stats, ms }
+ *
+ * @param {Object} msg
+ * @returns {void}
+ */
+function handlePlate(msg) {
+  const t0 = now();
+  const { id, w, h, params = {} } = msg;
+  const mask = new Uint8Array(msg.mask);
+  const r = buildPlate(mask, w, h, params);
+  const contours = r.contours.map((c) => ({ pts: c.pts.buffer, level: c.level, isHole: c.isHole, area: c.area }));
+  self.postMessage({ id, type: 'plateResult', contours, stats: r.stats, ms: now() - t0 }, contours.map((c) => c.pts));
+}
+
 self.onmessage = (event) => {
   const msg = event.data;
   if (!msg) return;
   try {
     if (msg.type === 'bake') handleBake(msg);
     else if (msg.type === 'sdf') handleSdf(msg);
+    else if (msg.type === 'plate') handlePlate(msg);
   } catch (err) {
     self.postMessage({
       id: msg.id,

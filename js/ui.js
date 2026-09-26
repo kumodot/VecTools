@@ -101,7 +101,7 @@ export function slider(parent, state, key, o) {
 
 /**
  * Checkbox bound to state[key].
- * @returns {{row: HTMLElement, set: (v: boolean) => void}}
+ * @returns {{row: HTMLElement, set: (v: boolean) => void, setDisabled: (d: boolean) => void}}
  */
 export function checkbox(parent, state, key, o) {
   const row = document.createElement('div');
@@ -117,7 +117,7 @@ export function checkbox(parent, state, key, o) {
   parent.appendChild(row);
   const set = (v) => { state[key] = v; cb.checked = v; };
   register(state, key, set);
-  return { row, set };
+  return { row, set, setDisabled: (d) => row.classList.toggle('disabled', d) };
 }
 
 /**
@@ -141,7 +141,7 @@ export function select(parent, state, key, o) {
   parent.appendChild(row);
   const set = (v) => { state[key] = v; sel.value = v; };
   register(state, key, set);
-  return { row, set, select: sel };
+  return { row, set, select: sel, setDisabled: (d) => row.classList.toggle('disabled', d) };
 }
 
 /**
@@ -160,7 +160,7 @@ export function color(parent, state, key, o) {
   parent.appendChild(row);
   const set = (v) => { state[key] = v; inp.value = v; };
   register(state, key, set);
-  return { row, set };
+  return { row, set, setDisabled: (d) => row.classList.toggle('disabled', d) };
 }
 
 /**

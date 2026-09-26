@@ -37,7 +37,7 @@ The lettering above is `Samples/VecTools_Sample.jpg` traced and inflated with th
 
 ## Run it
 
-**Local (recommended):** download / clone, double-click `RUN_VecTools_v0.6.1.bat`. It starts `python -m http.server` on port 8765 and opens the app. Python 3 required (ES modules and Web Workers do not load from `file://`). On macOS/Linux: `python3 -m http.server 8765` in the folder, then open `http://localhost:8765/`.
+**Local (recommended):** download / clone, double-click `RUN_VecTools_v0.7.0.bat`. It starts `python -m http.server` on port 8765 and opens the app. Python 3 required (ES modules and Web Workers do not load from `file://`). On macOS/Linux: `python3 -m http.server 8765` in the folder, then open `http://localhost:8765/`.
 
 **Hosted:** it is a static site, so any static host works. `index.html` redirects to the current versioned entry file.
 
@@ -61,6 +61,7 @@ Try it with the images in `Samples/`. Already have a vector? Drop an `.svg` on e
   - *Pillow / dome* and *Local-width dome*: puffier profiles.
   - Realtime GPU raymarch preview while you drag sliders, then **Bake mesh** (marching cubes + smoothing + island cleanup). The button lights up when the mesh is out of date.
   - *Cut front* / *Cut back*: flat faces from the mid plane, in the preview and in the bake. Cut back at 0 gives a relief with a flat base for 3D printing.
+- **Print plate**: a backing plate behind the body, kept as a *separate part* so you can give it its own filament colour. Shapes: *Contour* (follows the artwork; *Bridge gaps* joins the letters into one plate while large empty areas stay open, a hollow plate that saves filament), *Convex hull*, *Box*. Margin, fill holes / min hole, thickness, embed, edge rounding, colour. **Export > Print** writes `_body.stl` + `_plate.stl` in one zip with shared coordinates: import both in Bambu Studio / OrcaSlicer as one object with two parts.
 - **Environment**: drop `.hdr` / `.exr` maps in `hdr/` (or load one), rotation, orbit (auto-spin) with speed, intensity, exposure, HDR background.
 - **Material**: presets or custom color / metalness / roughness.
 - **Render**: supersampled anti-aliasing, glow, wireframe, flat shading, floor grid.
@@ -74,6 +75,7 @@ Try it with the images in `Samples/`. Already have a vector? Drop an `.svg` on e
 ## Tech notes
 - Trace: marching squares with hole nesting, Chaikin with corner threshold, closed-loop RDP, Schneider Bézier fitting. All in a Web Worker.
 - 3D: exact Euclidean distance transform → 3D SDF (rounded box in the distance/height plane) → GLSL raymarch preview → marching cubes bake → Taubin smoothing. Three.js for display, PMREM environments, bloom.
+- Print plate: morphological closing on the ink mask (dilate by margin + bridge, erode by bridge) → marching squares → ExtrudeGeometry. Preview, bake and plate share one pixel-to-world frame, so the two exported parts line up.
 - Self-tests: `node docs/trace-selftest.mjs`, `node docs/mesh-selftest.mjs`.
 
 ## Layout

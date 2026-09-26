@@ -1,0 +1,18 @@
+"A detailed, highly-ornamented monochromatic Victorian-style typography poster design. A solid black background is framed by an intricate, symmetric white acanthus scrollwork border. Smaller white ornamental flourishes and dividers are placed between the text lines for symmetry and balance. The text is rendered in multiple decorative white serif and script-like fonts, arranged in a balanced hierarchy. The overall composition is perfeitamente symmetrical, centered vector art with no textures or gradients."
+
+EXAMPLE with a Phrase in Portuguese : 
+
+Use este prompt inteiro e em inglês para máxima precisão com a maioria dos modelos de geração de imagem de IA:
+
+**"A highly-ornamented monochromatic Victorian-style typography poster design on a solid black background, framed by an intricate, symmetric white acanthus scrollwork border. Smaller white ornamental flourishes and dividers are placed between the text lines for symmetry and balance. The text is rendered in multiple decorative white serif and script-like fonts, arranged in a balanced hierarchy. The lines read:
+
+At the top, in stylized decorative serif: 'USE A CIÊNCIA PARA EXPLORAR'
+
+Centrally, in a very large, prominent decorative script: 'Descobertas'
+
+Below the script, in smaller decorative serif: 'NÃO SÓ PARA EXPLICAR'
+
+Penultimately, in a medium decorative serif: 'O MUNDO'
+
+And at the bottom, in a final decorative script and serif mix: 'POR VOCÊ MESMO.'
+The overall composition is perfectly symmetrical, centered, and rendered as clean vector art with no textures or gradients."**
