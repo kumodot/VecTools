@@ -1,5 +1,8 @@
 # VecTools changelog
 
+## 0.8.0 (2026-09-26)
+- **Strut brush** (Print plate > *Draw struts*): draw directly on the plate plane in the 3D viewport. Left button adds a strut, right button cuts the plate, *Brush width* sets the size. Undo (button or Ctrl+Z), Clear, Esc leaves the mode; orbit is paused while drawing. Strokes are stored in world units, saved in the `.vtools`, applied after the automatic struts (so both modes combine) and can run beyond the artwork.
+
 ## 0.7.4 (2026-09-26)
 - Plate struts: *Extra links* default raised to 14 (was 6) and the slider goes to 60, so the text block gets tied to the frame all around out of the box. Raise it further / lower *Link spacing* for a denser web.
 

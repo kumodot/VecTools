@@ -404,6 +404,53 @@ export class Viewer {
     this.invalidate();
   }
 
+  /**
+   * World xy where the mouse ray hits the plane z = planeZ (for drawing on the plate).
+   * @returns {{x: number, y: number}|null}
+   */
+  pickPlane(clientX, clientY, planeZ) {
+    const r = this.canvas.getBoundingClientRect();
+    const ndc = new THREE.Vector2(((clientX - r.left) / r.width) * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    const rc = new THREE.Raycaster();
+    rc.setFromCamera(ndc, this.camera);
+    const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -planeZ);
+    const hit = new THREE.Vector3();
+    return rc.ray.intersectPlane(plane, hit) ? { x: hit.x, y: hit.y } : null;
+  }
+
+  /** Lock orbit while a brush is active (fly mode is left alone). */
+  setDrawLock(on) {
+    this._drawLock = !!on;
+    if (this.navMode === 'orbit') this.controls.enabled = !on;
+    this.canvas.style.cursor = on ? 'crosshair' : '';
+  }
+
+  /**
+   * Overlay polylines (world units, drawn at z) for the strut brush.
+   * @param {Array<{pts: number[], mode: string}>} strokes  flat x,y lists
+   * @param {number} z
+   */
+  setStrokeOverlay(strokes, z) {
+    if (this.strokeGroup) { this.scene.remove(this.strokeGroup); this.strokeGroup.traverse((o) => o.geometry && o.geometry.dispose()); this.strokeGroup = null; }
+    if (!strokes || !strokes.length) { this.invalidate(); return; }
+    this.strokeGroup = new THREE.Group();
+    this._strokeMatAdd = this._strokeMatAdd || new THREE.LineBasicMaterial({ color: 0xffb347, depthTest: false, transparent: true, opacity: 0.9 });
+    this._strokeMatCut = this._strokeMatCut || new THREE.LineBasicMaterial({ color: 0xff6b6b, depthTest: false, transparent: true, opacity: 0.9 });
+    for (const st of strokes) {
+      const n = st.pts.length / 2;
+      if (n < 1) continue;
+      const arr = new Float32Array(Math.max(n, 2) * 3);
+      for (let i = 0; i < Math.max(n, 2); i++) { const k = Math.min(i, n - 1); arr[i * 3] = st.pts[k * 2]; arr[i * 3 + 1] = st.pts[k * 2 + 1]; arr[i * 3 + 2] = z + 0.05; }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(arr, 3));
+      const line = new THREE.Line(g, st.mode === 'cut' ? this._strokeMatCut : this._strokeMatAdd);
+      line.renderOrder = 10;
+      this.strokeGroup.add(line);
+    }
+    this.scene.add(this.strokeGroup);
+    this.invalidate();
+  }
+
   plateArrays() {
     if (!this.plateMesh) return null;
     const geo = this.plateMesh.geometry;

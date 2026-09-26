@@ -55,7 +55,7 @@ export class App3D {
       bakeRes: 512, smoothIter: 3, minIslandPct: 0,
       // print plate (world units), a separate part behind the body
       plateOn: false, plateShape: 'contour', plateMargin: 4, plateBridge: 0, plateCorner: 5,
-      plateFill: false, plateMinHole: 2, plateConnect: true, plateStrut: 3, plateLinkMax: 14, plateLinkGap: 12, plateThick: 2, plateEmbed: 0.3, plateBevel: 0, plateColor: '#3a3f47',
+      plateFill: false, plateMinHole: 2, plateConnect: true, plateStrut: 3, plateLinkMax: 14, plateLinkGap: 12, plateBrush: 3, plateStrokes: [], plateThick: 2, plateEmbed: 0.3, plateBevel: 0, plateColor: '#3a3f47',
       // environment
       hdr: '', hdrBackground: false, hdrBlur: 0, envRotation: 0, envSpin: false, envSpinSpeed: 20, envIntensity: 1, exposure: 1,
       // material
@@ -74,6 +74,7 @@ export class App3D {
     this.rebuildRaster = UI.debounce(() => this._rasterize(), 120);
     this.rebuildPlate = UI.debounce(() => this._requestPlate(), 150);
     this._buildUI();
+    this._initBrush();
     this._applyMode();
     this._applyEnvironment();
     this.scanHdrFolder();
@@ -149,6 +150,14 @@ export class App3D {
     this.rowPlateStrut = UI.slider(g, st, 'plateStrut', { label: 'Strut width', min: 0.5, max: 15, step: 0.1, onChange: pl });
     this.rowPlateLinkMax = UI.slider(g, st, 'plateLinkMax', { label: 'Extra links', min: 0, max: 60, step: 0.5, onChange: pl, title: 'Reach: besides the minimum set of struts that makes one piece, every gap between neighbouring pieces up to this length gets a strut too, so text and frame get linked all around. 0 = minimum only.' });
     this.rowPlateLinkGap = UI.slider(g, st, 'plateLinkGap', { label: 'Link spacing', min: 2, max: 60, step: 0.5, onChange: pl, title: 'Minimum distance between struts along one shared edge. Lower = more contact points.' });
+    // hand-drawn struts: draw on the plate plane in the viewport
+    this.rowPlateBrush = UI.slider(g, st, 'plateBrush', { label: 'Brush width', min: 0.5, max: 20, step: 0.1, title: 'Width of hand-drawn struts (left button) and cuts (right button).' });
+    this.drawBtns = UI.buttons(g, [
+      { label: 'Draw struts', onClick: () => this.setDrawMode(!this.drawMode), title: 'Draw on the plate in the viewport: left button adds a strut, right button cuts the plate. Esc exits. Orbit is paused while drawing.' },
+      { label: 'Undo', onClick: () => this.undoStroke() },
+      { label: 'Clear', onClick: () => this.clearStrokes() }
+    ]);
+    this.drawBtn = this.drawBtns[0];
     UI.slider(g, st, 'plateThick', { label: 'Thickness', min: 0.2, max: 20, step: 0.05, onChange: pg });
     UI.slider(g, st, 'plateEmbed', { label: 'Embed', min: 0, max: 3, step: 0.05, onChange: pg, title: 'How deep the plate top sinks into the body (overlap), so the two parts fuse in the slicer. 0 = touching.' });
     UI.slider(g, st, 'plateBevel', { label: 'Edge round', min: 0, max: 3, step: 0.05, onChange: pg, title: 'Rounds the plate edges (top and bottom).' });
@@ -286,6 +295,8 @@ export class App3D {
     this.plate = null;
     this.viewer.setPlateGeometry(null);
     this.plateStats('');
+    this.state.plateStrokes = [];
+    if (this.drawMode) this.setDrawMode(false);
     this.srcNote.textContent = `${result.contours.length} paths from ${result.baseName || 'image'}`;
     if (this.state.mode === 'blob') this._rasterize();
     else this._buildExtrude();
@@ -392,6 +403,9 @@ export class App3D {
       this.rowPlateLinkMax.setDisabled(!contour || !st.plateConnect);
       this.rowPlateLinkGap.setDisabled(!contour || !st.plateConnect || !(st.plateLinkMax > 0));
     }
+    if (this.rowPlateBrush) this.rowPlateBrush.setDisabled(!on);
+    if (this.drawBtns) for (const b of this.drawBtns) b.disabled = !on;
+    if (!on && this.drawMode) this.setDrawMode(false);
   }
 
   /** Ask the worker for the plate outline (pixel space) from the current raster. */
@@ -403,8 +417,87 @@ export class App3D {
     const buf = r.mask.slice().buffer;
     this.worker.postMessage({
       id, type: 'plate', mask: buf, w: r.w, h: r.h,
-      params: { shape: st.plateShape, margin: st.plateMargin * k, bridge: st.plateBridge * k, cornerRadius: st.plateCorner * k, fillHoles: st.plateFill, minHolePct: st.plateMinHole, connect: st.plateConnect, strutWidth: st.plateStrut * k, linkMax: st.plateLinkMax * k, linkSpacing: st.plateLinkGap * k }
+      params: { strokes: this._strokesPx(), shape: st.plateShape, margin: st.plateMargin * k, bridge: st.plateBridge * k, cornerRadius: st.plateCorner * k, fillHoles: st.plateFill, minHolePct: st.plateMinHole, connect: st.plateConnect, strutWidth: st.plateStrut * k, linkMax: st.plateLinkMax * k, linkSpacing: st.plateLinkGap * k }
     }, [buf]);
+  }
+
+  // ---- strut brush ----
+  /** Hand-drawn strokes converted from world units to raster pixels for the worker. */
+  _strokesPx() {
+    const f = this._frame();
+    if (!f) return [];
+    return (this.state.plateStrokes || []).map((st) => {
+      const pts = new Array(st.pts.length);
+      for (let k = 0; k < st.pts.length; k += 2) { pts[k] = f.cx + st.pts[k] / f.s; pts[k + 1] = f.cy - st.pts[k + 1] / f.s; }
+      return { pts, width: (st.width || this.state.plateBrush) / f.s, mode: st.mode || 'add' };
+    });
+  }
+
+  setDrawMode(on) {
+    on = !!on && this.state.plateOn && this.state.mode === 'blob';
+    if (on === !!this.drawMode) return;
+    this.drawMode = on;
+    this.drawBtn.classList.toggle('primary', on);
+    this.drawBtn.textContent = on ? 'Drawing… (Esc)' : 'Draw struts';
+    this.viewer.setDrawLock(on);
+    this._refreshStrokeOverlay();
+    if (on) this.setStatus('Draw struts: left button adds, right button cuts, Esc to stop.');
+  }
+
+  _refreshStrokeOverlay() {
+    const list = this.drawMode ? [...(this.state.plateStrokes || []), ...(this._liveStroke ? [this._liveStroke] : [])] : [];
+    this.viewer.setStrokeOverlay(list, this._plateTop());
+  }
+
+  _initBrush() {
+    const canvas = this.els.canvas;
+    canvas.addEventListener('contextmenu', (e) => { if (this.drawMode) e.preventDefault(); });
+    canvas.addEventListener('pointerdown', (e) => {
+      if (!this.drawMode || (e.button !== 0 && e.button !== 2)) return;
+      const p = this.viewer.pickPlane(e.clientX, e.clientY, this._plateTop());
+      if (!p) return;
+      e.preventDefault();
+      canvas.setPointerCapture(e.pointerId);
+      this._liveStroke = { pts: [p.x, p.y], width: this.state.plateBrush, mode: e.button === 2 ? 'cut' : 'add' };
+      this._refreshStrokeOverlay();
+    });
+    canvas.addEventListener('pointermove', (e) => {
+      if (!this.drawMode || !this._liveStroke) return;
+      const p = this.viewer.pickPlane(e.clientX, e.clientY, this._plateTop());
+      if (!p) return;
+      const pts = this._liveStroke.pts, n = pts.length;
+      if (Math.hypot(p.x - pts[n - 2], p.y - pts[n - 1]) < 0.4) return; // world units
+      pts.push(p.x, p.y);
+      this._refreshStrokeOverlay();
+    });
+    const finish = () => {
+      if (!this._liveStroke) return;
+      const st = this._liveStroke; this._liveStroke = null;
+      this.state.plateStrokes.push(st);
+      this._refreshStrokeOverlay();
+      this._requestPlate();
+    };
+    canvas.addEventListener('pointerup', finish);
+    canvas.addEventListener('pointercancel', finish);
+    window.addEventListener('keydown', (e) => {
+      if (!this.drawMode) return;
+      if (e.key === 'Escape') this.setDrawMode(false);
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); this.undoStroke(); }
+    });
+  }
+
+  undoStroke() {
+    if (!this.state.plateStrokes.length) return;
+    this.state.plateStrokes.pop();
+    this._refreshStrokeOverlay();
+    this._requestPlate();
+  }
+
+  clearStrokes() {
+    if (!this.state.plateStrokes.length) return;
+    this.state.plateStrokes = [];
+    this._refreshStrokeOverlay();
+    this._requestPlate();
   }
 
   /** World z of the plate's top face: the body's back plane plus the embed. */
@@ -472,6 +565,7 @@ export class App3D {
     this.viewer.raymarch.setParams(this._pixelParams());
     this.viewer.invalidate();
     if (this.plate && this.state.plateOn) this._buildPlateGeometry(); // plate top follows the back cut
+    if (this.drawMode) this._refreshStrokeOverlay();
     // A shape change while the baked mesh is on screen would be invisible:
     // flip back to the live preview so the change shows right away. The old
     // bake stays in memory (still exportable) until the next Bake.
@@ -733,6 +827,7 @@ export class App3D {
     if (!obj) return;
     UI.applyState(this.state, obj);
     this._applyProfile();
+    this.state.plateStrokes = (obj && Array.isArray(obj.plateStrokes)) ? obj.plateStrokes.map((s) => ({ pts: Array.from(s.pts || []), width: s.width, mode: s.mode || 'add' })) : [];
     this._applyPlateRows();
     this.viewer.setPlateColor(this.state.plateColor);
     this._applyEnvironment();

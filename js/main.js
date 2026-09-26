@@ -5,6 +5,9 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.8.0  Strut brush: draw struts (left button) and cuts (right button) on the
+ *         plate plane in the viewport; Undo / Clear / Esc; strokes saved in
+ *         the project and applied after the automatic struts.
  *  0.7.4  Plate struts reach: Extra links default 14 (was 6), slider to 60, so
  *         the text block gets linked to the frame all around by default.
  *  0.7.3  Print plate struts: Extra links + Link spacing add redundant contact
@@ -47,7 +50,7 @@
 import { TraceApp } from './appTrace.js';
 import { App3D } from './app3d.js';
 
-export const APP_VERSION = '0.7.4';
+export const APP_VERSION = '0.8.0';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 

@@ -235,6 +235,7 @@ export function connectPieces(mask, w, h, strutWidth, o = {}) {
  * @param {{shape?: 'box'|'contour'|'hull', margin?: number, bridge?: number,
  *          cornerRadius?: number, fillHoles?: boolean, minHolePct?: number,
  *          connect?: boolean, strutWidth?: number, linkMax?: number, linkSpacing?: number,
+ *          strokes?: Array<{pts: number[], width: number, mode: 'add'|'cut'}>,
  *          smoothIterations?: number, simplifyEps?: number}} opts  pixel units
  * @returns {{contours: Array<{pts: Float32Array, level: number, isHole: boolean, area: number}>,
  *            stats: {areaPx: number, islands: number, holes: number, struts: number, pad: number}}}
@@ -249,7 +250,15 @@ export function buildPlate(ink, w, h, opts = {}) {
 
   // ---- padded working canvas so dilation never touches the border --------
   const strutWidth = Math.max(1, opts.strutWidth || 1);
-  const pad = Math.ceil(margin + bridge + cornerRadius + (opts.connect ? strutWidth / 2 : 0)) + 3;
+  const strokes = Array.isArray(opts.strokes) ? opts.strokes : [];
+  let strokePad = 0;
+  for (const st of strokes) {
+    const r = (st.width || strutWidth) / 2 + 1;
+    for (let k = 0; k < st.pts.length; k += 2) {
+      strokePad = Math.max(strokePad, r - st.pts[k], st.pts[k] + r - w, r - st.pts[k + 1], st.pts[k + 1] + r - h);
+    }
+  }
+  const pad = Math.ceil(margin + bridge + cornerRadius + (opts.connect ? strutWidth / 2 : 0) + Math.max(0, strokePad)) + 3;
   const W = w + 2 * pad, H = h + 2 * pad;
   const src = new Uint8Array(W * H);
   let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity, inkCount = 0;
@@ -313,6 +322,19 @@ export function buildPlate(ink, w, h, opts = {}) {
 
   // ---- one part: strut every isolated piece to its nearest neighbour ------
   const struts = opts.connect ? connectPieces(plate, W, H, strutWidth, { extraMax: opts.linkMax || 0, spacing: opts.linkSpacing || 1 }) : 0;
+
+  // ---- hand-drawn struts / cuts (raster px, drawn after the automatic ones) --
+  for (const st of strokes) {
+    const width = Math.max(1, st.width || strutWidth);
+    const n = st.pts.length / 2;
+    if (n < 1) continue;
+    const tmp = st.mode === 'cut' ? new Uint8Array(W * H) : plate;
+    for (let k = 0; k < Math.max(1, n - 1); k++) {
+      const a = Math.min(k, n - 1), b = Math.min(k + 1, n - 1);
+      paintCapsule(tmp, W, H, st.pts[a * 2] + pad, st.pts[a * 2 + 1] + pad, st.pts[b * 2] + pad, st.pts[b * 2 + 1] + pad, width);
+    }
+    if (st.mode === 'cut') for (let i = 0; i < plate.length; i++) if (tmp[i]) plate[i] = 0;
+  }
 
   // ---- holes -------------------------------------------------------------
   let areaPx = 0;
