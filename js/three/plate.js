@@ -93,6 +93,108 @@ function distanceToMask(mask, w, h) {
 }
 
 /**
+ * Nearest-seed (feature) transform, 8SSED style: for every pixel, the
+ * coordinates of the nearest set pixel of `mask`. Two sweeps propagating the
+ * neighbours' nearest seed; a very good Euclidean approximation, which is all
+ * the strut placement needs.
+ *
+ * @returns {{nx: Int32Array, ny: Int32Array}}
+ */
+function nearestSeed(mask, w, h) {
+  const nx = new Int32Array(w * h).fill(-1), ny = new Int32Array(w * h).fill(-1);
+  const d2 = new Float64Array(w * h).fill(Infinity);
+  for (let i = 0; i < mask.length; i++) if (mask[i]) { nx[i] = i % w; ny[i] = (i / w) | 0; d2[i] = 0; }
+  const relax = (i, x, y, j) => {
+    if (nx[j] < 0) return;
+    const dx = x - nx[j], dy = y - ny[j], dd = dx * dx + dy * dy;
+    if (dd < d2[i]) { d2[i] = dd; nx[i] = nx[j]; ny[i] = ny[j]; }
+  };
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (x > 0) relax(i, x, y, i - 1);
+      if (y > 0) { relax(i, x, y, i - w); if (x > 0) relax(i, x, y, i - w - 1); if (x < w - 1) relax(i, x, y, i - w + 1); }
+    }
+    for (let x = w - 2; x >= 0; x--) relax(y * w + x, x, y, y * w + x + 1);
+  }
+  for (let y = h - 1; y >= 0; y--) {
+    for (let x = w - 1; x >= 0; x--) {
+      const i = y * w + x;
+      if (x < w - 1) relax(i, x, y, i + 1);
+      if (y < h - 1) { relax(i, x, y, i + w); if (x > 0) relax(i, x, y, i + w - 1); if (x < w - 1) relax(i, x, y, i + w + 1); }
+    }
+    for (let x = 1; x < w; x++) relax(y * w + x, x, y, y * w + x - 1);
+  }
+  return { nx, ny };
+}
+
+/** Paint a capsule (thick segment) of width `width` into the mask. */
+function paintCapsule(mask, w, h, x0, y0, x1, y1, width) {
+  const r = width / 2;
+  const bx0 = Math.max(0, Math.floor(Math.min(x0, x1) - r - 1)), bx1 = Math.min(w - 1, Math.ceil(Math.max(x0, x1) + r + 1));
+  const by0 = Math.max(0, Math.floor(Math.min(y0, y1) - r - 1)), by1 = Math.min(h - 1, Math.ceil(Math.max(y0, y1) + r + 1));
+  const dx = x1 - x0, dy = y1 - y0, len2 = dx * dx + dy * dy;
+  for (let y = by0; y <= by1; y++) {
+    for (let x = bx0; x <= bx1; x++) {
+      const px = x + 0.5 - x0, py = y + 0.5 - y0;
+      const t = len2 > 0 ? Math.max(0, Math.min(1, (px * dx + py * dy) / len2)) : 0;
+      const ex = px - t * dx, ey = py - t * dy;
+      if (ex * ex + ey * ey <= r * r) mask[y * w + x] = 1;
+    }
+  }
+}
+
+/**
+ * Connect every disconnected piece of the plate to its neighbours with struts
+ * so the plate prints as ONE part. Pieces are joined along a minimum spanning
+ * tree of their Voronoi adjacency: each strut runs between the two closest
+ * points of a pair of pieces, so an isolated ornament gets a short bar to the
+ * nearest piece rather than a long one to the main body.
+ *
+ * @param {Uint8Array} mask  Plate mask, modified in place.
+ * @param {number} strutWidth  Capsule width in pixels.
+ * @returns {number} Number of struts added.
+ */
+export function connectPieces(mask, w, h, strutWidth) {
+  const comp = labelComponents(mask, w, h, 1, 8);
+  if (comp.count < 2) return 0;
+  const { nx, ny } = nearestSeed(mask, w, h);
+  const labelOf = (i) => comp.labels[ny[i] * w + nx[i]];
+  // best (shortest) link per pair of Voronoi-adjacent pieces
+  const best = new Map();
+  const consider = (i, j) => {
+    const la = labelOf(i), lb = labelOf(j);
+    if (la === lb) return;
+    const key = la < lb ? la * (comp.count + 1) + lb : lb * (comp.count + 1) + la;
+    const dx = nx[i] - nx[j], dy = ny[i] - ny[j], d = dx * dx + dy * dy;
+    const cur = best.get(key);
+    if (!cur || d < cur.d) best.set(key, { d, la, lb, x0: nx[i], y0: ny[i], x1: nx[j], y1: ny[j] });
+  };
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (x < w - 1) consider(i, i + 1);
+      if (y < h - 1) consider(i, i + w);
+    }
+  }
+  // Kruskal
+  const edges = [...best.values()].sort((a, b) => a.d - b.d);
+  const parent = new Int32Array(comp.count + 1);
+  for (let i = 0; i < parent.length; i++) parent[i] = i;
+  const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
+  let struts = 0;
+  for (const e of edges) {
+    const ra = find(e.la), rb = find(e.lb);
+    if (ra === rb) continue;
+    parent[ra] = rb;
+    paintCapsule(mask, w, h, e.x0 + 0.5, e.y0 + 0.5, e.x1 + 0.5, e.y1 + 0.5, strutWidth);
+    struts++;
+    if (struts >= comp.count - 1) break;
+  }
+  return struts;
+}
+
+/**
  * Build the plate mask and trace it.
  *
  * @param {Uint8Array} ink  Ink mask, w*h, 1 = ink (the 3D raster).
@@ -100,9 +202,10 @@ function distanceToMask(mask, w, h) {
  * @param {number} h
  * @param {{shape?: 'box'|'contour'|'hull', margin?: number, bridge?: number,
  *          cornerRadius?: number, fillHoles?: boolean, minHolePct?: number,
+ *          connect?: boolean, strutWidth?: number,
  *          smoothIterations?: number, simplifyEps?: number}} opts  pixel units
  * @returns {{contours: Array<{pts: Float32Array, level: number, isHole: boolean, area: number}>,
- *            stats: {areaPx: number, islands: number, holes: number, pad: number}}}
+ *            stats: {areaPx: number, islands: number, holes: number, struts: number, pad: number}}}
  */
 export function buildPlate(ink, w, h, opts = {}) {
   const shape = opts.shape || 'contour';
@@ -113,7 +216,8 @@ export function buildPlate(ink, w, h, opts = {}) {
   const simplifyEps = opts.simplifyEps ?? 0.6;
 
   // ---- padded working canvas so dilation never touches the border --------
-  const pad = Math.ceil(margin + bridge + cornerRadius) + 3;
+  const strutWidth = Math.max(1, opts.strutWidth || 1);
+  const pad = Math.ceil(margin + bridge + cornerRadius + (opts.connect ? strutWidth / 2 : 0)) + 3;
   const W = w + 2 * pad, H = h + 2 * pad;
   const src = new Uint8Array(W * H);
   let bx0 = Infinity, by0 = Infinity, bx1 = -Infinity, by1 = -Infinity, inkCount = 0;
@@ -125,7 +229,7 @@ export function buildPlate(ink, w, h, opts = {}) {
       if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y;
     }
   }
-  if (!inkCount) return { contours: [], stats: { areaPx: 0, islands: 0, holes: 0, pad } };
+  if (!inkCount) return { contours: [], stats: { areaPx: 0, islands: 0, holes: 0, struts: 0, pad } };
 
   let plate;
   if (shape === 'box') {
@@ -175,6 +279,9 @@ export function buildPlate(ink, w, h, opts = {}) {
     } else plate = dil;
   }
 
+  // ---- one part: strut every isolated piece to its nearest neighbour ------
+  const struts = opts.connect ? connectPieces(plate, W, H, strutWidth) : 0;
+
   // ---- holes -------------------------------------------------------------
   let areaPx = 0;
   for (let i = 0; i < plate.length; i++) areaPx += plate[i];
@@ -207,5 +314,5 @@ export function buildPlate(ink, w, h, opts = {}) {
     for (let k = 0; k < pts.length; k += 2) { out[k] = pts[k] - pad; out[k + 1] = pts[k + 1] - pad; }
     contours.push({ pts: out, level: lp.level, isHole: lp.isHole, area: lp.area });
   }
-  return { contours, stats: { areaPx, islands, holes, pad } };
+  return { contours, stats: { areaPx, islands, holes, struts, pad } };
 }

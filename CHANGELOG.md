@@ -1,5 +1,8 @@
 # VecTools changelog
 
+## 0.7.2 (2026-09-26)
+- Print plate: **One piece** (on by default, Contour shape) with *Strut width*. When the plate comes out in several pieces, every isolated piece is joined to its nearest neighbour by a capsule strut, following a minimum spanning tree of the pieces, so a stray ornament gets a short bar to the closest piece instead of printing loose. Stats show the strut count.
+
 ## 0.7.1 (2026-09-26)
 - **Project name** field in the top bar (next to Save project). It fills in with the loaded image's name and can be edited any time; once you type a name it sticks across new images (clear it to go back to auto). Used for the `.vtools` file, SVG/DXF, STL/OBJ/PLY, PNG and print zip names, saved in the project and shown in the window title.
 

@@ -5,6 +5,9 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.7.2  Print plate "One piece": isolated plate pieces get struts to their
+ *         nearest neighbour (minimum spanning tree over the pieces' Voronoi
+ *         adjacency) so the plate always prints as a single part.
  *  0.7.1  Project name field in the top bar: pre-filled with the image name,
  *         editable any time, saved in .vtools, used for every export and the
  *         window title.
@@ -40,7 +43,7 @@
 import { TraceApp } from './appTrace.js';
 import { App3D } from './app3d.js';
 
-export const APP_VERSION = '0.7.1';
+export const APP_VERSION = '0.7.2';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 

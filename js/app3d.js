@@ -55,7 +55,7 @@ export class App3D {
       bakeRes: 512, smoothIter: 3, minIslandPct: 0,
       // print plate (world units), a separate part behind the body
       plateOn: false, plateShape: 'contour', plateMargin: 4, plateBridge: 0, plateCorner: 5,
-      plateFill: false, plateMinHole: 2, plateThick: 2, plateEmbed: 0.3, plateBevel: 0, plateColor: '#3a3f47',
+      plateFill: false, plateMinHole: 2, plateConnect: true, plateStrut: 3, plateThick: 2, plateEmbed: 0.3, plateBevel: 0, plateColor: '#3a3f47',
       // environment
       hdr: '', hdrBackground: false, hdrBlur: 0, envRotation: 0, envSpin: false, envSpinSpeed: 20, envIntensity: 1, exposure: 1,
       // material
@@ -145,6 +145,8 @@ export class App3D {
     this.rowPlateCorner = UI.slider(g, st, 'plateCorner', { label: 'Corner radius', min: 0, max: 30, step: 0.1, onChange: pl });
     this.rowPlateFill = UI.checkbox(g, st, 'plateFill', { label: 'Fill holes', onChange: () => { this._applyPlateRows(); pl(); }, title: 'Solid plate: every enclosed pocket is filled.' });
     this.rowPlateMinHole = UI.slider(g, st, 'plateMinHole', { label: 'Min hole', min: 0, max: 20, step: 0.1, unit: '%', onChange: pl, title: 'Pockets smaller than this % of the plate area are filled, so the plate is not peppered with tiny holes.' });
+    this.rowPlateConnect = UI.checkbox(g, st, 'plateConnect', { label: 'One piece', onChange: () => { this._applyPlateRows(); pl(); }, title: 'If the plate comes out in several pieces, each isolated piece gets a strut to its nearest neighbour, so the plate prints as one part.' });
+    this.rowPlateStrut = UI.slider(g, st, 'plateStrut', { label: 'Strut width', min: 0.5, max: 15, step: 0.1, onChange: pl });
     UI.slider(g, st, 'plateThick', { label: 'Thickness', min: 0.2, max: 20, step: 0.05, onChange: pg });
     UI.slider(g, st, 'plateEmbed', { label: 'Embed', min: 0, max: 3, step: 0.05, onChange: pg, title: 'How deep the plate top sinks into the body (overlap), so the two parts fuse in the slicer. 0 = touching.' });
     UI.slider(g, st, 'plateBevel', { label: 'Edge round', min: 0, max: 3, step: 0.05, onChange: pg, title: 'Rounds the plate edges (top and bottom).' });
@@ -376,13 +378,15 @@ export class App3D {
   _applyPlateRows() {
     const st = this.state, on = st.plateOn;
     const contour = st.plateShape === 'contour', box = st.plateShape === 'box';
-    const rows = [this.rowPlateShape, this.rowPlateMargin, this.rowPlateBridge, this.rowPlateCorner, this.rowPlateFill, this.rowPlateMinHole];
+    const rows = [this.rowPlateShape, this.rowPlateMargin, this.rowPlateBridge, this.rowPlateCorner, this.rowPlateFill, this.rowPlateMinHole, this.rowPlateConnect, this.rowPlateStrut];
     for (const r of rows) if (r && r.setDisabled) r.setDisabled(!on);
     if (on) {
       this.rowPlateBridge.setDisabled(!contour);
       this.rowPlateCorner.setDisabled(!box);
       this.rowPlateFill.setDisabled(box);
       this.rowPlateMinHole.setDisabled(box || st.plateFill);
+      this.rowPlateConnect.setDisabled(!contour);
+      this.rowPlateStrut.setDisabled(!contour || !st.plateConnect);
     }
   }
 
@@ -395,7 +399,7 @@ export class App3D {
     const buf = r.mask.slice().buffer;
     this.worker.postMessage({
       id, type: 'plate', mask: buf, w: r.w, h: r.h,
-      params: { shape: st.plateShape, margin: st.plateMargin * k, bridge: st.plateBridge * k, cornerRadius: st.plateCorner * k, fillHoles: st.plateFill, minHolePct: st.plateMinHole }
+      params: { shape: st.plateShape, margin: st.plateMargin * k, bridge: st.plateBridge * k, cornerRadius: st.plateCorner * k, fillHoles: st.plateFill, minHolePct: st.plateMinHole, connect: st.plateConnect, strutWidth: st.plateStrut * k }
     }, [buf]);
   }
 
@@ -423,7 +427,7 @@ export class App3D {
     const areaU = s.areaPx * frame.s * frame.s; // world units^2
     const mm = st.exportSizeMm > 0 ? this._exportScale() : 0;
     const tris = (geo.getIndex() ? geo.getIndex().count : geo.getAttribute('position').count) / 3;
-    let line = `pieces   ${s.islands}   holes ${s.holes}\ntris     ${tris.toFixed(0)}`;
+    let line = `pieces   ${s.islands}   holes ${s.holes}${s.struts ? '   struts ' + s.struts : ''}\ntris     ${tris.toFixed(0)}`;
     if (mm > 0) {
       const areaMm = areaU * mm * mm, volCm3 = areaMm * st.plateThick * mm / 1000;
       line += `\narea     ${(areaMm / 100).toFixed(1)} cm²   volume ${volCm3.toFixed(1)} cm³`;
