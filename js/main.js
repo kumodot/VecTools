@@ -5,6 +5,9 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.7.1  Project name field in the top bar: pre-filled with the image name,
+ *         editable any time, saved in .vtools, used for every export and the
+ *         window title.
  *  0.7.0  Print plate: backing plate as a separate part (Contour with gap
  *         bridging / hollow areas, Convex hull, Box), Export > Print zip with
  *         body + plate STL in shared coordinates. Shared pixel-to-world frame
@@ -37,7 +40,7 @@
 import { TraceApp } from './appTrace.js';
 import { App3D } from './app3d.js';
 
-export const APP_VERSION = '0.7.0';
+export const APP_VERSION = '0.7.1';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 
@@ -62,12 +65,42 @@ function initTabs(onSwitch) {
   return activate;
 }
 
+/**
+ * Project name: one field in the top bar, used for the .vtools file name, every
+ * export and the window title. It follows the loaded image's name until the
+ * user types a name of their own; a loaded project restores its saved name.
+ */
+const projectName = {
+  el: null,
+  custom: false, // true once the user typed a name (auto naming stops)
+  get() { return sanitizeName(this.el ? this.el.value : ''); },
+  set(name, custom) { if (this.el) this.el.value = name || ''; this.custom = !!custom; updateTitle(); },
+  /** Called when a new image is loaded: adopt its name unless the user set one. */
+  suggest(name) { if (!this.custom || !this.get()) this.set(name, false); }
+};
+function sanitizeName(s) {
+  return String(s || '').trim().replace(/[\\/:*?"<>|]+/g, '_').replace(/\s+/g, ' ').slice(0, 120);
+}
+function updateTitle() {
+  const n = projectName.get();
+  document.title = n ? `${n} - ${APP_NAME} v${APP_VERSION}` : `${APP_NAME} v${APP_VERSION}`;
+}
+function initProjectName(trace, app3d) {
+  projectName.el = $('#projectName');
+  projectName.el.addEventListener('input', () => { projectName.custom = projectName.get().length > 0; updateTitle(); });
+  projectName.el.addEventListener('keydown', (e) => { if (e.key === 'Enter') projectName.el.blur(); e.stopPropagation(); });
+  projectName.el.addEventListener('keyup', (e) => e.stopPropagation()); // keep paint shortcuts (X, B, [ ]) out of the field
+  trace.nameProvider = () => projectName.get();
+  app3d.nameProvider = () => projectName.get();
+}
+
 /** Build a .vtools project object. */
 function buildProject(trace, app3d) {
   return {
     app: APP_NAME,
     format: 1,
     version: APP_VERSION,
+    name: projectName.get(),
     saved: new Date().toISOString(),
     source: trace.result ? { name: trace.baseName, width: trace.result.width, height: trace.result.height } : null,
     trace: trace.getProjectState(),
@@ -79,13 +112,15 @@ function loadProject(obj, trace, app3d) {
   if (!obj || obj.app !== APP_NAME) throw new Error('Not a VecTools project file');
   trace.applyProjectState(obj.trace);
   app3d.applyProjectState(obj.three);
-  setStatus(`Project loaded (saved with v${obj.version || '?'})`);
+  if (obj.name) projectName.set(obj.name, true);
+  else if (obj.source && obj.source.name) projectName.set(obj.source.name, false);
+  setStatus(`Project loaded${obj.name ? ': ' + obj.name : ''} (saved with v${obj.version || '?'})`);
 }
 
 function initProject(trace, app3d) {
   $('#saveBtn').addEventListener('click', () => {
     const obj = buildProject(trace, app3d);
-    const name = (trace.baseName || 'project') + PROJECT_EXT;
+    const name = (projectName.get() || trace.baseName || 'project') + PROJECT_EXT;
     const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob); a.download = name;
@@ -141,6 +176,7 @@ function main() {
     }
   });
   trace.onResult = (r) => {
+    if (r.baseName) projectName.suggest(r.baseName);
     dirty3d = true;
     $('#threeHint').style.display = 'none';
     if (current === 'three') { app3d.setSource(r); dirty3d = false; }
@@ -148,6 +184,7 @@ function main() {
   trace.onSendTo3D = () => activate('three');
   app3d.onLoadSvg = (file) => trace.loadFile(file); // result lands in the 3D tab via trace.onResult
   initAbout();
+  initProjectName(trace, app3d);
   initProject(trace, app3d);
   window.vectools = { trace, app3d, version: APP_VERSION }; // handy for debugging from the console
   setStatus('Ready. Load an image to start.');

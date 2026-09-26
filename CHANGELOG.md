@@ -1,5 +1,8 @@
 # VecTools changelog
 
+## 0.7.1 (2026-09-26)
+- **Project name** field in the top bar (next to Save project). It fills in with the loaded image's name and can be edited any time; once you type a name it sticks across new images (clear it to go back to auto). Used for the `.vtools` file, SVG/DXF, STL/OBJ/PLY, PNG and print zip names, saved in the project and shown in the window title.
+
 ## 0.7.0 (2026-09-26)
 - **Print plate** (3D tab, Blob mode): backing plate behind the body as a separate part for two-colour printing. Shapes: *Contour* (silhouette + margin; *Bridge gaps* closes gaps narrower than 2x the value so letters share one plate while big empty areas stay open), *Convex hull*, *Box* (corner radius). *Fill holes* / *Min hole*, *Thickness*, *Embed* (overlap into the body), *Edge round*, *Color*. Stats: pieces, holes, triangles, area and volume (with Export size).
 - **Export > Print (body + plate .zip)**: `<name>_body.stl` + `<name>_plate.stl` with shared coordinates and a README, ready for "load as a single object with multiple parts" in Bambu Studio / OrcaSlicer. Export size (mm) applies to the whole assembly.

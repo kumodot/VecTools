@@ -22,6 +22,7 @@ export class TraceApp {
     this.worker.onerror = (e) => this.setStatus('Worker error: ' + e.message, 'err');
     this.reqId = 0;
     this.pixels = null; this.width = 0; this.height = 0; this.baseName = 'image';
+    this.nameProvider = null; // () => project name, set by main.js; falls back to the image name
     this.result = null;
     this.onResult = null;
 
@@ -320,11 +321,17 @@ export class TraceApp {
     this.trace();
   }
 
+  /** Name used for exported files: the project name when set, else the source image name. */
+  exportName() {
+    const n = this.nameProvider ? this.nameProvider() : '';
+    return n || this.baseName || 'image';
+  }
+
   exportSVG() {
     if (!this.result) return this.setStatus('Nothing to export yet.', 'err');
     const r = this.result;
     const svg = buildSVG({ contours: r.contours, beziers: this.state.curves ? r.beziers : null, width: r.width, height: r.height, fill: '#000000', background: null });
-    UI.download(new Blob([svg], { type: 'image/svg+xml' }), `${r.baseName}_vectorized.svg`);
+    UI.download(new Blob([svg], { type: 'image/svg+xml' }), `${this.exportName()}_vectorized.svg`);
     this.setStatus('SVG exported.');
   }
 
@@ -332,7 +339,7 @@ export class TraceApp {
     if (!this.result) return this.setStatus('Nothing to export yet.', 'err');
     const r = this.result;
     const dxf = buildDXF({ contours: r.contours, width: r.width, height: r.height });
-    UI.download(new Blob([dxf], { type: 'application/dxf' }), `${r.baseName}_vectorized.dxf`);
+    UI.download(new Blob([dxf], { type: 'application/dxf' }), `${this.exportName()}_vectorized.dxf`);
     this.setStatus('DXF exported.');
   }
 }

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>VecTools</title>
-<link rel="stylesheet" href="css/style.css?v=0.7.0">
+<link rel="stylesheet" href="css/style.css?v=0.7.1">
 <script type="importmap">
 {
   "imports": {
@@ -24,6 +24,7 @@
     </div>
     <div class="spacer"></div>
     <div id="status" class="status"></div>
+    <input id="projectName" class="pname" type="text" placeholder="project name" spellcheck="false" title="Project name: used for the .vtools file and every export (SVG, STL, PNG, print zip). Defaults to the loaded image's name until you type one.">
     <button id="loadBtn" class="btn small" title="Load a .vtools project (2D + 3D settings)">Load project</button>
     <button id="saveBtn" class="btn small" title="Save all settings as a .vtools file">Save project</button>
     <button id="aboutBtn" class="btn small">About</button>
@@ -65,7 +66,7 @@
     </div>
   </div>
 
-  <script type="module" src="js/main.js?v=0.7.0"></script>
+  <script type="module" src="js/main.js?v=0.7.1"></script>
   <script>
     // hide the drop hint once an image is loaded
     window.addEventListener('load', () => {

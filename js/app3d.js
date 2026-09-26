@@ -41,6 +41,7 @@ export class App3D {
     this.plate = null;       // { contours, stats } from the worker (pixel space)
     this.plateReqId = 0;
     this.baseName = 'model';
+    this.nameProvider = null; // () => project name, set by main.js; falls back to the source name
 
     this.state = {
       mode: 'blob', rasterRes: 1024, useCurves: true, sdfBlur: 0.5,
@@ -707,7 +708,7 @@ export class App3D {
         scale: this._captureSize().scale, supersample: st.captureSupersample, transparent: st.captureTransparent,
         onProgress: (f) => this.setStatus(`Rendering PNG… ${Math.round(f * 100)}%`, 'busy')
       });
-      UI.download(blob, `${this.baseName}_${st.mode === 'blob' ? st.profile : 'extrude'}_render.png`);
+      UI.download(blob, `${this.exportName()}_${st.mode === 'blob' ? st.profile : 'extrude'}_render.png`);
       this.setStatus('PNG saved.');
     } catch (err) { this.setStatus('Capture failed: ' + err.message, 'err'); }
   }
@@ -734,6 +735,12 @@ export class App3D {
   }
 
   // ------------------------------------------------------------------ export
+  /** Name used for exported files: the project name when set, else the source image name. */
+  exportName() {
+    const n = this.nameProvider ? this.nameProvider() : '';
+    return n || this.baseName || 'model';
+  }
+
   /** Longest xy side (world units) over a list of position arrays. */
   static _longestXY(arrays) {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -778,7 +785,7 @@ export class App3D {
     const body = App3D._scaled(this.viewer.exportArrays(), k);
     const plate = App3D._scaled(this.viewer.plateArrays(), k);
     const mm = st.exportSizeMm;
-    const base = `${this.baseName}_${st.profile}${mm > 0 ? '_' + mm + 'mm' : ''}`;
+    const base = `${this.exportName()}_${st.profile}${mm > 0 ? '_' + mm + 'mm' : ''}`;
     const files = {};
     files[`${base}_body.stl`] = new Uint8Array(toSTLBinary(body.positions, body.indices, 'VecTools body'));
     files[`${base}_plate.stl`] = new Uint8Array(toSTLBinary(plate.positions, plate.indices, 'VecTools plate'));
@@ -801,7 +808,7 @@ export class App3D {
       // uniform scale so the longest xy side equals `mm` (STL/OBJ/PLY carry no unit; readers assume mm)
       a = App3D._scaled(a, this._exportScale());
     }
-    const name = `${this.baseName}_${this.state.mode === 'blob' ? this.state.profile : 'extrude'}${mm > 0 ? '_' + mm + 'mm' : ''}`;
+    const name = `${this.exportName()}_${this.state.mode === 'blob' ? this.state.profile : 'extrude'}${mm > 0 ? '_' + mm + 'mm' : ''}`;
     let blob, ext;
     if (kind === 'stl') { blob = new Blob([toSTLBinary(a.positions, a.indices, 'VecTools')], { type: 'model/stl' }); ext = 'stl'; }
     else if (kind === 'obj') { blob = new Blob([toOBJ(a.positions, a.indices, a.normals, name)], { type: 'text/plain' }); ext = 'obj'; }
