@@ -1,5 +1,9 @@
 # VecTools changelog
 
+## 0.6.0 (2026-09-26)
+- *Width → thickness* (Blob group): thickness by coverage. The 2D local stroke-width map (the same field behind *Local-width dome*) now scales the base half thickness, so thin strokes get a thinner, rounder slab like ink would, in every profile. *Width ref* (0 = auto, widest part), *Width floor* (hairlines never vanish) and *Width curve* control it. Preview and bake.
+- Capture: *Longest side* in pixels replaces the viewport multiplier; the group shows the exact output size (and the supersampled render size) for the current viewport.
+
 ## 0.5.0 (2026-09-26)
 - PNG capture: new *Supersample* (1x-4x). The image is rendered at N times the output size in tiles (`camera.setViewOffset`, tiles overlap when glow is on) and box-filtered down by successive 2x halvings, so 4x = 16 samples per pixel. Progress shown in the status bar. Large outputs no longer depend on GPU canvas limits.
 - Environment: *Orbit environment* checkbox + *Orbit speed* (°/s, negative reverses) keep the HDR turning so reflections move across the surface. The Rotation slider follows, so projects save the current angle. Paused during capture.

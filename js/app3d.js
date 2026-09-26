@@ -41,6 +41,7 @@ export class App3D {
       // blob (world units)
       profile: 'roundedExtrude', halfThickness: 3, roundRadius: 3,
       bulge: 1, bulgePower: 1, maxBulge: 3, thinProtect: 0, thicknessRadius: 6,
+      thickByWidth: 0, widthRef: 0, widthFloor: 0.15, widthPow: 1,
       steps: 160, sectionOn: false, sectionZ: 0, backOn: false, backZ: 0,
       bakeRes: 512, smoothIter: 3, minIslandPct: 0,
       // environment
@@ -51,7 +52,7 @@ export class App3D {
       renderScale: 1.5, glow: 0, glowRadius: 0.3, glowThreshold: 1.5,
       wire: false, flat: false, grid: true,
       // capture
-      captureScale: 2, captureSupersample: 2, captureTransparent: true,
+      captureLongest: 2048, captureSupersample: 2, captureTransparent: true,
       exportSizeMm: 0,
       // navigation
       navMode: 'orbit', laziness: 0.5, flySpeed: 60, hidePointer: false
@@ -108,7 +109,11 @@ export class App3D {
     this.rowBulgePow = UI.slider(g, st, 'bulgePower', { label: 'Bulge power', min: 0.2, max: 4, step: 0.01, onChange: bl, title: '<1 puffy, 1 linear, >1 sharp ridge' });
     this.rowMaxBulge = UI.slider(g, st, 'maxBulge', { label: 'Max bulge', min: 0.1, max: 20, step: 0.05, onChange: bl });
     this.rowThin = UI.slider(g, st, 'thinProtect', { label: 'Thin protect', min: 0, max: 1, step: 0.01, onChange: bl, title: 'Floor on the dome height so hairlines keep some volume.' });
-    this.rowThickR = UI.slider(g, st, 'thicknessRadius', { label: 'Width search', min: 1, max: 30, step: 0.5, onChange: () => this._requestSDF(), title: 'Search radius for the local stroke width (Local-width profile).' });
+    this.rowThickR = UI.slider(g, st, 'thicknessRadius', { label: 'Width search', min: 1, max: 30, step: 0.5, onChange: () => this._requestSDF(), title: 'Search radius for the local stroke width map (used by Local-width dome and Width → thickness).' });
+    UI.slider(g, st, 'thickByWidth', { label: 'Width → thickness', min: 0, max: 1, step: 0.01, onChange: () => { bl(); this._applyProfile(); }, title: 'Thickness by coverage: thin strokes get a thinner slab, like ink. 0 = constant thickness, 1 = fully proportional to the local stroke width.' });
+    this.rowWidthRef = UI.slider(g, st, 'widthRef', { label: 'Width ref', min: 0, max: 30, step: 0.1, onChange: bl, title: 'Stroke half-width that counts as full thickness (world units). 0 = auto (widest part of the artwork).' });
+    this.rowWidthFloor = UI.slider(g, st, 'widthFloor', { label: 'Width floor', min: 0, max: 1, step: 0.01, onChange: bl, title: 'Minimum thickness ratio so hairlines never vanish.' });
+    this.rowWidthPow = UI.slider(g, st, 'widthPow', { label: 'Width curve', min: 0.2, max: 3, step: 0.01, onChange: bl, title: '<1 keeps thin parts thicker, >1 thins them faster.' });
     UI.slider(g, st, 'steps', { label: 'Preview steps', min: 32, max: 400, step: 8, onChange: bl, title: 'Raymarch steps. Lower if the preview is slow.' });
     UI.checkbox(g, st, 'sectionOn', { label: 'Cut front', onChange: bl, title: 'Flat front face: everything above this height (from the mid plane) is removed. Applies to the preview and the bake.' });
     UI.slider(g, st, 'sectionZ', { label: 'Front height', min: 0, max: 20, step: 0.05, onChange: bl });
@@ -173,10 +178,13 @@ export class App3D {
 
     // --- capture ---
     g = UI.group(sb, 'Capture PNG');
-    UI.slider(g, st, 'captureScale', { label: 'Resolution', min: 1, max: 4, step: 0.5, unit: 'x', title: 'Output size as a multiple of the viewport.' });
-    UI.slider(g, st, 'captureSupersample', { label: 'Supersample', min: 1, max: 4, step: 1, unit: 'x', title: 'Anti-aliasing for the saved PNG: renders at N times the output size and box-filters down (4x = 16 samples per pixel). Rendered in tiles, so large outputs are fine.' });
+    UI.slider(g, st, 'captureLongest', { label: 'Longest side', min: 512, max: 8192, step: 64, unit: 'px', onChange: () => this._updateCaptureInfo(), title: 'Output resolution: pixels on the longest side. The aspect ratio is the viewport\'s.' });
+    this.captureInfo = UI.note(g, '');
+    UI.slider(g, st, 'captureSupersample', { label: 'Supersample', min: 1, max: 4, step: 1, unit: 'x', onChange: () => this._updateCaptureInfo(), title: 'Anti-aliasing for the saved PNG: renders at N times the output size and box-filters down (4x = 16 samples per pixel). Rendered in tiles, so large outputs are fine.' });
     UI.checkbox(g, st, 'captureTransparent', { label: 'Transparent', title: 'Alpha background, grid hidden. Glow keeps its alpha.' });
     UI.buttons(g, [{ label: 'Save PNG', primary: true, onClick: () => this.capture() }]);
+    window.addEventListener('resize', () => this._updateCaptureInfo());
+    setTimeout(() => this._updateCaptureInfo(), 0);
 
     g = UI.group(sb, 'Export');
     UI.buttons(g, [
@@ -192,7 +200,9 @@ export class App3D {
     const dome = this.state.profile !== 'roundedExtrude';
     const local = this.state.profile === 'localWidth';
     for (const r of [this.rowBulge, this.rowBulgePow, this.rowMaxBulge, this.rowThin]) r.setDisabled(!dome);
-    this.rowThickR.setDisabled(!local);
+    const useWidth = this.state.thickByWidth > 0;
+    this.rowThickR.setDisabled(!local && !useWidth);
+    for (const r of [this.rowWidthRef, this.rowWidthFloor, this.rowWidthPow]) r.setDisabled(!useWidth);
   }
 
   _applyMode() {
@@ -323,6 +333,11 @@ export class App3D {
       bulge: st.bulge, bulgePower: st.bulgePower,
       maxBulge: st.maxBulge * k,
       thinProtect: st.thinProtect,
+      thickByWidth: st.thickByWidth,
+      widthRef: st.widthRef * k,
+      widthFloor: st.widthFloor,
+      widthPow: st.widthPow,
+      maxThickness: this.sdf ? this.sdf.maxThickness : 0,
       steps: st.steps,
       sectionZ: st.sectionOn ? st.sectionZ : -1,
       sectionBack: st.backOn ? st.backZ : -1
@@ -374,7 +389,7 @@ export class App3D {
     }
     if (m.id !== this.reqId) return;
     if (m.type === 'sdfResult') {
-      this.sdf = { sdf2d: new Float32Array(m.sdf2d), thickness: new Float32Array(m.thickness), w: m.w, h: m.h };
+      this.sdf = { sdf2d: new Float32Array(m.sdf2d), thickness: new Float32Array(m.thickness), w: m.w, h: m.h, maxThickness: m.maxThickness || 0 };
       this.viewer.raymarch.setField(this.sdf.sdf2d, this.sdf.thickness, m.w, m.h, this.raster.bbox, TARGET_SIZE);
       this._updatePreviewParams();
       this._applyVisibility();
@@ -527,12 +542,27 @@ export class App3D {
     inp.click();
   }
 
+  /** Output size in pixels for the current viewport and Longest side setting. */
+  _captureSize() {
+    const v = this.viewer;
+    const vw = Math.max(1, Math.round((v._w || 1) * v.baseRatio)), vh = Math.max(1, Math.round((v._h || 1) * v.baseRatio));
+    const scale = this.state.captureLongest / Math.max(vw, vh);
+    return { w: Math.round(vw * scale), h: Math.round(vh * scale), scale, vw, vh };
+  }
+
+  _updateCaptureInfo() {
+    if (!this.captureInfo) return;
+    const c = this._captureSize();
+    const ss = this.state.captureSupersample;
+    this.captureInfo.textContent = `Output ${c.w} × ${c.h} px (viewport ${c.vw} × ${c.vh}, rendered at ${c.w * ss} × ${c.h * ss} then reduced)`;
+  }
+
   async capture() {
     const st = this.state;
     this.setStatus('Rendering PNG…', 'busy');
     try {
       const blob = await this.viewer.capturePNG({
-        scale: st.captureScale, supersample: st.captureSupersample, transparent: st.captureTransparent,
+        scale: this._captureSize().scale, supersample: st.captureSupersample, transparent: st.captureTransparent,
         onProgress: (f) => this.setStatus(`Rendering PNG… ${Math.round(f * 100)}%`, 'busy')
       });
       UI.download(blob, `${this.baseName}_${st.mode === 'blob' ? st.profile : 'extrude'}_render.png`);

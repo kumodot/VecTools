@@ -127,7 +127,11 @@ function handleBake(msg) {
     targetSize = 100,
     minIslandPct = 0,
     cutFront = null,
-    cutBack = null
+    cutBack = null,
+    thickByWidth = 0,
+    widthRef = 0,
+    widthFloor = 0.15,
+    widthPow = 1
   } = params;
 
   /**
@@ -143,7 +147,7 @@ function handleBake(msg) {
   const meta = buildField({
     sdf2d, thickness, w, h,
     profile, halfThickness, roundRadius, bulge, bulgePower,
-    maxBulge, thinProtect, resolution, cutFront, cutBack,
+    maxBulge, thinProtect, resolution, cutFront, cutBack, thickByWidth, widthRef, widthFloor, widthPow,
     onProgress: (v) => progress('field', v)
   });
 
@@ -254,8 +258,10 @@ function handleSdf(msg) {
   const mask = new Uint8Array(msg.mask);
   const sdf2d = gaussianBlur(signedDistanceField(mask, w, h), w, h, blurSigma);
   const thickness = localThickness(sdf2d, w, h, Math.max(1, Math.round(thicknessRadius)));
+  let maxThickness = 0;
+  for (let i = 0; i < thickness.length; i++) if (thickness[i] > maxThickness) maxThickness = thickness[i];
   self.postMessage(
-    { id, type: 'sdfResult', sdf2d: sdf2d.buffer, thickness: thickness.buffer, w, h, ms: now() - t0 },
+    { id, type: 'sdfResult', sdf2d: sdf2d.buffer, thickness: thickness.buffer, w, h, maxThickness, ms: now() - t0 },
     [sdf2d.buffer, thickness.buffer]
   );
 }

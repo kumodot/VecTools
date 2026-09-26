@@ -184,8 +184,16 @@ export function buildField(opts) {
     zPadding = 3,
     cutFront = null,   // pixel units: keep world z <= cutFront  (flat front face); null = off
     cutBack = null,    // pixel units: keep world z >= -cutBack  (flat back face); null = off
+    thickByWidth = 0,  // 0..1: how much the base half thickness follows the local stroke width
+    widthRef = 0,      // pixel units: local half-width that counts as "full"; 0 = max of the thickness field
+    widthFloor = 0.15, // minimum thickness ratio for hairlines
+    widthPow = 1,      // ratio curve exponent
     onProgress
   } = opts;
+  const useWidth = thickByWidth > 0;
+  if (useWidth && !thickness) throw new Error('buildField: thickByWidth requires opts.thickness');
+  let wRef = widthRef;
+  if (useWidth && !(wRef > 0)) { wRef = 1e-6; for (let i = 0; i < thickness.length; i++) if (thickness[i] > wRef) wRef = thickness[i]; }
   // gridToWorld negates z, so world z = -pz: a front cut keeps pz >= -cutFront,
   // a back cut keeps pz <= cutBack. Both are applied as extra half-space SDFs.
   const zFront = (cutFront != null && cutFront >= 0) ? -cutFront : null;
@@ -196,6 +204,7 @@ export function buildField(opts) {
   if (useLocal && !thickness) {
     throw new Error('buildField: PROFILES.LOCAL_WIDTH requires opts.thickness');
   }
+  // (thickByWidth also needs the thickness field; checked above)
 
   // ---- 1. Pixel bounding box of the (slightly dilated) shape -------------
   const dilate = roundRadius + 2;
@@ -286,11 +295,17 @@ export function buildField(opts) {
       const d = sampleBilinear(sdf2d, w, h, px, py);
       planeD[j * nx + i] = d;
       let Hs;
+      const lw = (useLocal || useWidth) ? sampleBilinear(thickness, w, h, px, py) : 0;
+      // "thickness by coverage": scale the base slab by the local stroke width (ink-like behaviour)
+      let Hbase = halfThickness;
+      if (useWidth) {
+        let t = lw / wRef; if (t > 1) t = 1; if (t < widthFloor) t = widthFloor;
+        Hbase = halfThickness * (1 - thickByWidth + thickByWidth * Math.pow(t, widthPow));
+      }
       if (isDome) {
-        const lw = useLocal ? sampleBilinear(thickness, w, h, px, py) : 0;
-        Hs = domeHalfHeight(d, lw, useLocal, halfThickness, bulge, bulgePower, maxBulge, thinProtect);
+        Hs = domeHalfHeight(d, lw, useLocal, Hbase, bulge, bulgePower, maxBulge, thinProtect);
       } else {
-        Hs = halfThickness;
+        Hs = Hbase;
       }
       planeH[j * nx + i] = Hs;
       planeR[j * nx + i] = Math.min(roundRadius, Hs);

@@ -37,7 +37,7 @@ The lettering above is `Samples/VecTools_Sample.jpg` traced and inflated with th
 
 ## Run it
 
-**Local (recommended):** download / clone, double-click `RUN_VecTools_v0.5.0.bat`. It starts `python -m http.server` on port 8765 and opens the app. Python 3 required (ES modules and Web Workers do not load from `file://`). On macOS/Linux: `python3 -m http.server 8765` in the folder, then open `http://localhost:8765/`.
+**Local (recommended):** download / clone, double-click `RUN_VecTools_v0.6.0.bat`. It starts `python -m http.server` on port 8765 and opens the app. Python 3 required (ES modules and Web Workers do not load from `file://`). On macOS/Linux: `python3 -m http.server 8765` in the folder, then open `http://localhost:8765/`.
 
 **Hosted:** it is a static site, so any static host works. `index.html` redirects to the current versioned entry file.
 
@@ -57,6 +57,7 @@ Try it with the images in `Samples/`. Already have a vector? Drop an `.svg` on e
 - **Extrude**: classic extrude with optional inset bevel.
 - **Blob / Inflate**: the good part. The vector becomes a signed distance field and gets a rounded profile:
   - *Rounded extrude*: flat slab with a filleted edge. Strokes thinner than the fillet automatically turn into thinner rounded tubes, so hairlines never become fins.
+  - *Width → thickness*: thickness by coverage. The local stroke-width map scales the slab, so thin strokes get thinner and rounder, like ink.
   - *Pillow / dome* and *Local-width dome*: puffier profiles.
   - Realtime GPU raymarch preview while you drag sliders, then **Bake mesh** (marching cubes + smoothing + island cleanup). The button lights up when the mesh is out of date.
   - *Cut front* / *Cut back*: flat faces from the mid plane, in the preview and in the bake. Cut back at 0 gives a relief with a flat base for 3D printing.
@@ -64,7 +65,7 @@ Try it with the images in `Samples/`. Already have a vector? Drop an `.svg` on e
 - **Material**: presets or custom color / metalness / roughness.
 - **Render**: supersampled anti-aliasing, glow, wireframe, flat shading, floor grid.
 - **Navigation**: Orbit or Fly (W/A/S/D + mouse look, pointer lock), *Laziness* eases the camera.
-- **Capture PNG** at 1x-4x with tiled supersampling (up to 16 samples per pixel), optionally transparent.
+- **Capture PNG** at any pixel size (longest side) with tiled supersampling (up to 16 samples per pixel), optionally transparent.
 - Export **STL**, **OBJ**, **PLY**. Units: longest side = 100, or set *Export size (mm)* to get the longest side in millimetres directly.
 
 ### Projects

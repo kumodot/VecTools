@@ -38,6 +38,10 @@ uniform float uBulge;
 uniform float uBulgePow;
 uniform float uMaxBulge;
 uniform float uThinProtect;
+uniform float uThickAmt;       // 0..1 thickness-by-width blend
+uniform float uThickRef;       // px, local half-width that counts as full
+uniform float uThickFloor;
+uniform float uThickPow;
 uniform vec3  uBoundsMin;      // pixel-space box (z centred on 0)
 uniform vec3  uBoundsMax;
 uniform vec2  uCenter;         // pixel-space centre used by the world mapping
@@ -92,6 +96,12 @@ float roundedBox(float d, float z, float H, float r) {
   return min(max(qx, qy), 0.0) + length(max(q, 0.0)) - r;
 }
 
+float baseHalfT(float lw) {
+  if (uThickAmt <= 0.0) return uHalfT;
+  float t = clamp(lw / max(uThickRef, 1e-6), uThickFloor, 1.0);
+  return uHalfT * mix(1.0, pow(t, uThickPow), uThickAmt);
+}
+
 float domeHalfHeight(float d, float lw) {
   float din = max(-d, 0.0);
   bool useLocal = uProfile == 2;
@@ -101,12 +111,12 @@ float domeHalfHeight(float d, float lw) {
   float hgt = scaleH * uBulge * pow(t, uBulgePow);
   float floorH = uThinProtect * min(din, R);
   hgt = max(hgt, floorH);
-  return uHalfT + hgt;
+  return baseHalfT(lw) + hgt;
 }
 
 float map(vec3 p) {
   vec2 f = sampleField(p.xy);
-  float Hs = uProfile == 0 ? uHalfT : domeHalfHeight(f.r, f.g);
+  float Hs = uProfile == 0 ? baseHalfT(f.g) : domeHalfHeight(f.r, f.g);
   float r = min(uRound, Hs);
   float v = roundedBox(f.r, p.z, Hs, r);
   if (uSectionZ >= 0.0) {
@@ -264,6 +274,10 @@ export class RaymarchPreview {
         uBulgePow: { value: 1 },
         uMaxBulge: { value: 8 },
         uThinProtect: { value: 0 },
+        uThickAmt: { value: 0 },
+        uThickRef: { value: 1 },
+        uThickFloor: { value: 0.15 },
+        uThickPow: { value: 1 },
         uBoundsMin: { value: new THREE.Vector3() },
         uBoundsMax: { value: new THREE.Vector3() },
         uCenter: { value: new THREE.Vector2() },
@@ -356,6 +370,10 @@ export class RaymarchPreview {
     u.uBulgePow.value = p.bulgePower;
     u.uMaxBulge.value = p.maxBulge;
     u.uThinProtect.value = p.thinProtect;
+    u.uThickAmt.value = p.thickByWidth ?? 0;
+    u.uThickRef.value = p.widthRef > 0 ? p.widthRef : (p.maxThickness || 1);
+    u.uThickFloor.value = p.widthFloor ?? 0.15;
+    u.uThickPow.value = p.widthPow ?? 1;
     u.uSteps.value = p.steps;
     u.uSectionZ.value = p.sectionZ ?? -1;
     u.uSectionBack.value = p.sectionBack ?? -1;
