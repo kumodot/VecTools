@@ -1,5 +1,8 @@
 # VecTools changelog
 
+## 0.7.4 (2026-09-26)
+- Plate struts: *Extra links* default raised to 14 (was 6) and the slider goes to 60, so the text block gets tied to the frame all around out of the box. Raise it further / lower *Link spacing* for a denser web.
+
 ## 0.7.3 (2026-09-26)
 - Print plate struts: **Extra links** (every gap between neighbouring pieces up to this length gets a strut, on top of the minimum tree; 0 = minimum only) and **Link spacing** (minimum distance between struts along one shared edge). Long shared edges now get a row of contact points instead of a single weak bar.
 
