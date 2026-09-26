@@ -16,3 +16,12 @@ Penultimately, in a medium decorative serif: 'O MUNDO'
 
 And at the bottom, in a final decorative script and serif mix: 'POR VOCÊ MESMO.'
 The overall composition is perfectly symmetrical, centered, and rendered as clean vector art with no textures or gradients."**
+
+
+Dai usei esse prompt pra gerar : 
+**"A highly-ornamented monochromatic Victorian-style typography poster design on a solid black background, framed by an intricate, symmetric white acanthus scrollwork border. Smaller white ornamental flourishes and dividers are placed between the text lines for symmetry and balance. The text is rendered in multiple decorative white serif and script-like fonts, arranged in a balanced hierarchy. The lines read:
+
+"As BETs apostaram que iam explorar as pessoas.
+E perderam. Acontece sempre, com apostas." 
+
+E o resultado ficou super rebuscado com arabescos de moldura com muitos detalhes, muitas partes intrincadas. Quero mais minimal sempre. 

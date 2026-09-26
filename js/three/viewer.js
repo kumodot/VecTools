@@ -15,8 +15,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { RaymarchPreview } from './raymarch.js';
-import { FlyControls } from './flyControls.js';
+import { RaymarchPreview } from './raymarch.js?v=0.8.1';
+import { FlyControls } from './flyControls.js?v=0.8.1';
 
 export const MATERIAL_PRESETS = {
   gold:   { color: '#ffc14d', metalness: 1.0, roughness: 0.28 },

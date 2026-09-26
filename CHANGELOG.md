@@ -1,5 +1,9 @@
 # VecTools changelog
 
+## 0.8.1 (2026-09-26)
+- Cache-proof loading: every internal module import and worker URL carries `?v=<version>`, and the `.bat` launcher now runs `serve.py` (Cache-Control: no-store). Fixes an update running with a stale module from the browser cache (symptom: Plate on but no plate, brush controls greyed out).
+- Print plate UI tolerant to a stale `ui.js`.
+
 ## 0.8.0 (2026-09-26)
 - **Strut brush** (Print plate > *Draw struts*): draw directly on the plate plane in the 3D viewport. Left button adds a strut, right button cuts the plate, *Brush width* sets the size. Undo (button or Ctrl+Z), Clear, Esc leaves the mode; orbit is paused while drawing. Strokes are stored in world units, saved in the `.vtools`, applied after the automatic struts (so both modes combine) and can run beyond the artwork.
 

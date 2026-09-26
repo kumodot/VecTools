@@ -1,0 +1,16 @@
+Portrait 3:4. Creative vintage hand-lettered typography poster. Background is pure jet black (#000000), not charcoal, not gray. All artwork in flat off-white (#F5F0E6). No gradients, textures, shadows, engraving or 3D effects.
+
+BORDER (open, not a closed box): bold, chunky acanthus scroll ornaments in the 4 corners, simple curvy shapes, not filigree. Between the corners, only a few short line segments with small spiral curls, leaving open gaps. All lines medium-bold weight, never hairline thin. No full rectangular frame, no double lines.
+
+TEXT (centered, exactly these lines in this order):
+Line 1 (arched upward like a curved banner, medium): "As BETS apostaram"
+Line 2 (hero, largest, straight): "E PERDERAM."
+Line 3 (medium): "Acontece SEMPRE,"
+Line 4 (medium-large): "com APOSTAS."
+Render every word exactly as written, with this exact capitalization. Do not shorten, rephrase or skip any words.
+
+LETTERING: creative, dynamic, charming hand-drawn vintage lettering, like a hand-painted 1890s saloon or apothecary sign made by a skilled sign painter. Each line has its own lettering style, but they all feel part of one family. Mixed case: Use small caps for regular words, with oversized decorative swash initials. Key words are set in full-size bold capitals so they stand out.Oversized decorative initial capitals with curly swashes, strong size contrast between lines, playful curves and flowing tails on some letters. Letters feel drawn, not a digital font. No sans-serif, no modern fonts, no thin script. Perfect spelling with all Portuguese accents.
+
+ORNAMENTS: one small bold flourish above the arched line, and one short medium-weight divider with a small fleur-de-lis between sections. Maximum 3 ornaments inside the border. No hands, arrows or icons.
+
+Overall: elegant, lively and creative, balanced and symmetrical, generous negative space. Moderate detail like a classic chalkboard sign, not ornate engraving.

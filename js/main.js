@@ -5,6 +5,9 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.8.1  Cache-proof loading: every module import carries ?v=, the .bat
+ *         launcher serves with Cache-Control: no-store (serve.py). Plate UI
+ *         tolerant to a stale ui.js.
  *  0.8.0  Strut brush: draw struts (left button) and cuts (right button) on the
  *         plate plane in the viewport; Undo / Clear / Esc; strokes saved in
  *         the project and applied after the automatic struts.
@@ -47,10 +50,10 @@
  *         three profiles, realtime raymarch preview, marching-cubes bake,
  *         STL/OBJ/PLY export).
  */
-import { TraceApp } from './appTrace.js';
-import { App3D } from './app3d.js';
+import { TraceApp } from './appTrace.js?v=0.8.1';
+import { App3D } from './app3d.js?v=0.8.1';
 
-export const APP_VERSION = '0.8.0';
+export const APP_VERSION = '0.8.1';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 

@@ -14,11 +14,11 @@
  * (`_frame()`), so the baked body and the plate line up exactly and can be
  * exported as two separate parts for two-colour printing.
  */
-import * as UI from './ui.js';
-import { Viewer, MATERIAL_PRESETS } from './three/viewer.js';
-import { buildShapes, buildExtrudeGeometry } from './three/extrude.js';
-import { toSTLBinary, toOBJ, toPLYBinary } from './three/exporters.js';
-import { buildPlateGeometry, geometryArrays } from './three/plateGeometry.js';
+import * as UI from './ui.js?v=0.8.1';
+import { Viewer, MATERIAL_PRESETS } from './three/viewer.js?v=0.8.1';
+import { buildShapes, buildExtrudeGeometry } from './three/extrude.js?v=0.8.1';
+import { toSTLBinary, toOBJ, toPLYBinary } from './three/exporters.js?v=0.8.1';
+import { buildPlateGeometry, geometryArrays } from './three/plateGeometry.js?v=0.8.1';
 import { zipSync } from 'three/addons/libs/fflate.module.js';
 
 const TARGET_SIZE = 100;
@@ -29,7 +29,7 @@ export class App3D {
     this.els = els;
     this.setStatus = els.setStatus;
     this.viewer = new Viewer(els.canvas);
-    this.worker = new Worker(new URL('./three/meshWorker.js', import.meta.url), { type: 'module' });
+    this.worker = new Worker(new URL('./three/meshWorker.js?v=0.8.1', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e) => this._onWorker(e.data);
     this.worker.onerror = (e) => this.setStatus('Mesh worker error: ' + e.message, 'err');
     this.reqId = 0;
@@ -391,19 +391,19 @@ export class App3D {
   _applyPlateRows() {
     const st = this.state, on = st.plateOn;
     const contour = st.plateShape === 'contour', box = st.plateShape === 'box';
-    const rows = [this.rowPlateShape, this.rowPlateMargin, this.rowPlateBridge, this.rowPlateCorner, this.rowPlateFill, this.rowPlateMinHole, this.rowPlateConnect, this.rowPlateStrut, this.rowPlateLinkMax, this.rowPlateLinkGap];
-    for (const r of rows) if (r && r.setDisabled) r.setDisabled(!on);
+    const dis = (row, d) => { if (row && typeof row.setDisabled === 'function') row.setDisabled(d); };
+    const rows = [this.rowPlateShape, this.rowPlateMargin, this.rowPlateBridge, this.rowPlateCorner, this.rowPlateFill, this.rowPlateMinHole, this.rowPlateConnect, this.rowPlateStrut, this.rowPlateLinkMax, this.rowPlateLinkGap, this.rowPlateBrush];
+    for (const r of rows) dis(r, !on);
     if (on) {
-      this.rowPlateBridge.setDisabled(!contour);
-      this.rowPlateCorner.setDisabled(!box);
-      this.rowPlateFill.setDisabled(box);
-      this.rowPlateMinHole.setDisabled(box || st.plateFill);
-      this.rowPlateConnect.setDisabled(!contour);
-      this.rowPlateStrut.setDisabled(!contour || !st.plateConnect);
-      this.rowPlateLinkMax.setDisabled(!contour || !st.plateConnect);
-      this.rowPlateLinkGap.setDisabled(!contour || !st.plateConnect || !(st.plateLinkMax > 0));
+      dis(this.rowPlateBridge, !contour);
+      dis(this.rowPlateCorner, !box);
+      dis(this.rowPlateFill, box);
+      dis(this.rowPlateMinHole, box || st.plateFill);
+      dis(this.rowPlateConnect, !contour);
+      dis(this.rowPlateStrut, !contour || !st.plateConnect);
+      dis(this.rowPlateLinkMax, !contour || !st.plateConnect);
+      dis(this.rowPlateLinkGap, !contour || !st.plateConnect || !(st.plateLinkMax > 0));
     }
-    if (this.rowPlateBrush) this.rowPlateBrush.setDisabled(!on);
     if (this.drawBtns) for (const b of this.drawBtns) b.disabled = !on;
     if (!on && this.drawMode) this.setDrawMode(false);
   }
