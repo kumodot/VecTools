@@ -1,5 +1,8 @@
 # VecTools changelog
 
+## 0.7.3 (2026-09-26)
+- Print plate struts: **Extra links** (every gap between neighbouring pieces up to this length gets a strut, on top of the minimum tree; 0 = minimum only) and **Link spacing** (minimum distance between struts along one shared edge). Long shared edges now get a row of contact points instead of a single weak bar.
+
 ## 0.7.2 (2026-09-26)
 - Print plate: **One piece** (on by default, Contour shape) with *Strut width*. When the plate comes out in several pieces, every isolated piece is joined to its nearest neighbour by a capsule strut, following a minimum spanning tree of the pieces, so a stray ornament gets a short bar to the closest piece instead of printing loose. Stats show the strut count.
 

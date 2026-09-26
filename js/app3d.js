@@ -55,7 +55,7 @@ export class App3D {
       bakeRes: 512, smoothIter: 3, minIslandPct: 0,
       // print plate (world units), a separate part behind the body
       plateOn: false, plateShape: 'contour', plateMargin: 4, plateBridge: 0, plateCorner: 5,
-      plateFill: false, plateMinHole: 2, plateConnect: true, plateStrut: 3, plateThick: 2, plateEmbed: 0.3, plateBevel: 0, plateColor: '#3a3f47',
+      plateFill: false, plateMinHole: 2, plateConnect: true, plateStrut: 3, plateLinkMax: 6, plateLinkGap: 12, plateThick: 2, plateEmbed: 0.3, plateBevel: 0, plateColor: '#3a3f47',
       // environment
       hdr: '', hdrBackground: false, hdrBlur: 0, envRotation: 0, envSpin: false, envSpinSpeed: 20, envIntensity: 1, exposure: 1,
       // material
@@ -147,6 +147,8 @@ export class App3D {
     this.rowPlateMinHole = UI.slider(g, st, 'plateMinHole', { label: 'Min hole', min: 0, max: 20, step: 0.1, unit: '%', onChange: pl, title: 'Pockets smaller than this % of the plate area are filled, so the plate is not peppered with tiny holes.' });
     this.rowPlateConnect = UI.checkbox(g, st, 'plateConnect', { label: 'One piece', onChange: () => { this._applyPlateRows(); pl(); }, title: 'If the plate comes out in several pieces, each isolated piece gets a strut to its nearest neighbour, so the plate prints as one part.' });
     this.rowPlateStrut = UI.slider(g, st, 'plateStrut', { label: 'Strut width', min: 0.5, max: 15, step: 0.1, onChange: pl });
+    this.rowPlateLinkMax = UI.slider(g, st, 'plateLinkMax', { label: 'Extra links', min: 0, max: 40, step: 0.5, onChange: pl, title: 'Redundancy: besides the minimum set of struts that makes one piece, every gap between neighbouring pieces up to this length gets a strut too. 0 = minimum only.' });
+    this.rowPlateLinkGap = UI.slider(g, st, 'plateLinkGap', { label: 'Link spacing', min: 2, max: 60, step: 0.5, onChange: pl, title: 'Minimum distance between struts along one shared edge. Lower = more contact points.' });
     UI.slider(g, st, 'plateThick', { label: 'Thickness', min: 0.2, max: 20, step: 0.05, onChange: pg });
     UI.slider(g, st, 'plateEmbed', { label: 'Embed', min: 0, max: 3, step: 0.05, onChange: pg, title: 'How deep the plate top sinks into the body (overlap), so the two parts fuse in the slicer. 0 = touching.' });
     UI.slider(g, st, 'plateBevel', { label: 'Edge round', min: 0, max: 3, step: 0.05, onChange: pg, title: 'Rounds the plate edges (top and bottom).' });
@@ -378,7 +380,7 @@ export class App3D {
   _applyPlateRows() {
     const st = this.state, on = st.plateOn;
     const contour = st.plateShape === 'contour', box = st.plateShape === 'box';
-    const rows = [this.rowPlateShape, this.rowPlateMargin, this.rowPlateBridge, this.rowPlateCorner, this.rowPlateFill, this.rowPlateMinHole, this.rowPlateConnect, this.rowPlateStrut];
+    const rows = [this.rowPlateShape, this.rowPlateMargin, this.rowPlateBridge, this.rowPlateCorner, this.rowPlateFill, this.rowPlateMinHole, this.rowPlateConnect, this.rowPlateStrut, this.rowPlateLinkMax, this.rowPlateLinkGap];
     for (const r of rows) if (r && r.setDisabled) r.setDisabled(!on);
     if (on) {
       this.rowPlateBridge.setDisabled(!contour);
@@ -387,6 +389,8 @@ export class App3D {
       this.rowPlateMinHole.setDisabled(box || st.plateFill);
       this.rowPlateConnect.setDisabled(!contour);
       this.rowPlateStrut.setDisabled(!contour || !st.plateConnect);
+      this.rowPlateLinkMax.setDisabled(!contour || !st.plateConnect);
+      this.rowPlateLinkGap.setDisabled(!contour || !st.plateConnect || !(st.plateLinkMax > 0));
     }
   }
 
@@ -399,7 +403,7 @@ export class App3D {
     const buf = r.mask.slice().buffer;
     this.worker.postMessage({
       id, type: 'plate', mask: buf, w: r.w, h: r.h,
-      params: { shape: st.plateShape, margin: st.plateMargin * k, bridge: st.plateBridge * k, cornerRadius: st.plateCorner * k, fillHoles: st.plateFill, minHolePct: st.plateMinHole, connect: st.plateConnect, strutWidth: st.plateStrut * k }
+      params: { shape: st.plateShape, margin: st.plateMargin * k, bridge: st.plateBridge * k, cornerRadius: st.plateCorner * k, fillHoles: st.plateFill, minHolePct: st.plateMinHole, connect: st.plateConnect, strutWidth: st.plateStrut * k, linkMax: st.plateLinkMax * k, linkSpacing: st.plateLinkGap * k }
     }, [buf]);
   }
 

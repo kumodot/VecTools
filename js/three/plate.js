@@ -145,30 +145,44 @@ function paintCapsule(mask, w, h, x0, y0, x1, y1, width) {
 }
 
 /**
- * Connect every disconnected piece of the plate to its neighbours with struts
- * so the plate prints as ONE part. Pieces are joined along a minimum spanning
- * tree of their Voronoi adjacency: each strut runs between the two closest
- * points of a pair of pieces, so an isolated ornament gets a short bar to the
- * nearest piece rather than a long one to the main body.
+ * Connect every disconnected piece of the plate with struts so it prints as
+ * ONE part, with as many contact points as the geometry allows.
+ *
+ * 1. Every pair of Voronoi-adjacent pieces gets its shortest link (closest
+ *    points), and a minimum spanning tree over those links guarantees a single
+ *    part: an isolated ornament gets a short bar to the nearest piece rather
+ *    than a long one to the main body.
+ * 2. Redundancy: along the Voronoi boundary between two pieces every local
+ *    gap no longer than `extraMax` becomes a strut too, as long as it stays at
+ *    least `spacing` away from the struts already placed for that pair. A long
+ *    shared edge (a frame line next to a text block) therefore gets a row of
+ *    struts instead of a single weak one.
  *
  * @param {Uint8Array} mask  Plate mask, modified in place.
  * @param {number} strutWidth  Capsule width in pixels.
+ * @param {{extraMax?: number, spacing?: number}} [o]  pixels; extraMax 0 = tree only
  * @returns {number} Number of struts added.
  */
-export function connectPieces(mask, w, h, strutWidth) {
+export function connectPieces(mask, w, h, strutWidth, o = {}) {
   const comp = labelComponents(mask, w, h, 1, 8);
   if (comp.count < 2) return 0;
+  const extraMax = Math.max(0, o.extraMax || 0);
+  const spacing = Math.max(1, o.spacing || 1);
   const { nx, ny } = nearestSeed(mask, w, h);
   const labelOf = (i) => comp.labels[ny[i] * w + nx[i]];
-  // best (shortest) link per pair of Voronoi-adjacent pieces
-  const best = new Map();
+  // per pair: shortest link + every boundary candidate (for the extra links)
+  const pairs = new Map();
+  const K = comp.count + 1;
   const consider = (i, j) => {
     const la = labelOf(i), lb = labelOf(j);
     if (la === lb) return;
-    const key = la < lb ? la * (comp.count + 1) + lb : lb * (comp.count + 1) + la;
+    const key = la < lb ? la * K + lb : lb * K + la;
     const dx = nx[i] - nx[j], dy = ny[i] - ny[j], d = dx * dx + dy * dy;
-    const cur = best.get(key);
-    if (!cur || d < cur.d) best.set(key, { d, la, lb, x0: nx[i], y0: ny[i], x1: nx[j], y1: ny[j] });
+    let p = pairs.get(key);
+    if (!p) { p = { la, lb, best: null, cand: [] }; pairs.set(key, p); }
+    const c = { d, x0: nx[i], y0: ny[i], x1: nx[j], y1: ny[j] };
+    if (!p.best || d < p.best.d) p.best = c;
+    if (extraMax > 0 && d <= extraMax * extraMax) p.cand.push(c);
   };
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
@@ -177,19 +191,37 @@ export function connectPieces(mask, w, h, strutWidth) {
       if (y < h - 1) consider(i, i + w);
     }
   }
-  // Kruskal
-  const edges = [...best.values()].sort((a, b) => a.d - b.d);
-  const parent = new Int32Array(comp.count + 1);
-  for (let i = 0; i < parent.length; i++) parent[i] = i;
+  const paint = (c) => paintCapsule(mask, w, h, c.x0 + 0.5, c.y0 + 0.5, c.x1 + 0.5, c.y1 + 0.5, strutWidth);
+  // 1. minimum spanning tree (Kruskal) on the shortest links
+  const edges = [...pairs.values()].sort((a, b) => a.best.d - b.best.d);
+  const parent = new Int32Array(K);
+  for (let i = 0; i < K; i++) parent[i] = i;
   const find = (a) => { while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; } return a; };
   let struts = 0;
-  for (const e of edges) {
-    const ra = find(e.la), rb = find(e.lb);
+  for (const p of edges) {
+    const ra = find(p.la), rb = find(p.lb);
+    p.placed = [];
     if (ra === rb) continue;
     parent[ra] = rb;
-    paintCapsule(mask, w, h, e.x0 + 0.5, e.y0 + 0.5, e.x1 + 0.5, e.y1 + 0.5, strutWidth);
-    struts++;
-    if (struts >= comp.count - 1) break;
+    paint(p.best); p.placed.push(p.best); struts++;
+  }
+  // 2. extra contact points along each shared boundary
+  if (extraMax > 0) {
+    const s2 = spacing * spacing;
+    for (const p of pairs.values()) {
+      if (!p.cand.length) continue;
+      p.cand.sort((a, b) => a.d - b.d);
+      for (const c of p.cand) {
+        const mx = (c.x0 + c.x1) / 2, my = (c.y0 + c.y1) / 2;
+        let ok = true;
+        for (const q of p.placed) {
+          const qx = (q.x0 + q.x1) / 2, qy = (q.y0 + q.y1) / 2;
+          if ((mx - qx) * (mx - qx) + (my - qy) * (my - qy) < s2) { ok = false; break; }
+        }
+        if (!ok) continue;
+        paint(c); p.placed.push(c); struts++;
+      }
+    }
   }
   return struts;
 }
@@ -202,7 +234,7 @@ export function connectPieces(mask, w, h, strutWidth) {
  * @param {number} h
  * @param {{shape?: 'box'|'contour'|'hull', margin?: number, bridge?: number,
  *          cornerRadius?: number, fillHoles?: boolean, minHolePct?: number,
- *          connect?: boolean, strutWidth?: number,
+ *          connect?: boolean, strutWidth?: number, linkMax?: number, linkSpacing?: number,
  *          smoothIterations?: number, simplifyEps?: number}} opts  pixel units
  * @returns {{contours: Array<{pts: Float32Array, level: number, isHole: boolean, area: number}>,
  *            stats: {areaPx: number, islands: number, holes: number, struts: number, pad: number}}}
@@ -280,7 +312,7 @@ export function buildPlate(ink, w, h, opts = {}) {
   }
 
   // ---- one part: strut every isolated piece to its nearest neighbour ------
-  const struts = opts.connect ? connectPieces(plate, W, H, strutWidth) : 0;
+  const struts = opts.connect ? connectPieces(plate, W, H, strutWidth, { extraMax: opts.linkMax || 0, spacing: opts.linkSpacing || 1 }) : 0;
 
   // ---- holes -------------------------------------------------------------
   let areaPx = 0;

@@ -5,6 +5,8 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.7.3  Print plate struts: Extra links + Link spacing add redundant contact
+ *         points along shared edges (every gap up to the limit gets a strut).
  *  0.7.2  Print plate "One piece": isolated plate pieces get struts to their
  *         nearest neighbour (minimum spanning tree over the pieces' Voronoi
  *         adjacency) so the plate always prints as a single part.
@@ -43,7 +45,7 @@
 import { TraceApp } from './appTrace.js';
 import { App3D } from './app3d.js';
 
-export const APP_VERSION = '0.7.2';
+export const APP_VERSION = '0.7.3';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 
