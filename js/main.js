@@ -5,6 +5,8 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.8.2  Export > Print (.3mf, 2 parts): one 3MF object with body + plate
+ *         components, aligned and laid on the bed, for Bambu / Orca / Prusa.
  *  0.8.1  Cache-proof loading: every module import carries ?v=, the .bat
  *         launcher serves with Cache-Control: no-store (serve.py). Plate UI
  *         tolerant to a stale ui.js.
@@ -50,10 +52,10 @@
  *         three profiles, realtime raymarch preview, marching-cubes bake,
  *         STL/OBJ/PLY export).
  */
-import { TraceApp } from './appTrace.js?v=0.8.1';
-import { App3D } from './app3d.js?v=0.8.1';
+import { TraceApp } from './appTrace.js?v=0.8.2';
+import { App3D } from './app3d.js?v=0.8.2';
 
-export const APP_VERSION = '0.8.1';
+export const APP_VERSION = '0.8.2';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 

@@ -5,9 +5,9 @@
  * canvas view. Emits `onResult(result)` whenever a fresh trace lands so the
  * 3D tab can pick it up.
  */
-import * as UI from './ui.js?v=0.8.1';
-import { TraceView } from './traceView.js?v=0.8.1';
-import { buildSVG, buildDXF } from './trace/svgExport.js?v=0.8.1';
+import * as UI from './ui.js?v=0.8.2';
+import { TraceView } from './traceView.js?v=0.8.2';
+import { buildSVG, buildDXF } from './trace/svgExport.js?v=0.8.2';
 
 export class TraceApp {
   /**
@@ -17,7 +17,7 @@ export class TraceApp {
     this.els = els;
     this.setStatus = els.setStatus;
     this.view = new TraceView(els.canvas);
-    this.worker = new Worker(new URL('./trace/traceWorker.js?v=0.8.1', import.meta.url), { type: 'module' });
+    this.worker = new Worker(new URL('./trace/traceWorker.js?v=0.8.2', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e) => this._onWorker(e.data);
     this.worker.onerror = (e) => this.setStatus('Worker error: ' + e.message, 'err');
     this.reqId = 0;

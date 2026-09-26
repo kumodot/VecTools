@@ -10,7 +10,7 @@
  * without any cooperative cancellation machinery.
  */
 
-import { toGray, boxBlur, otsu, binarize } from './binarize.js?v=0.8.1';
+import { toGray, boxBlur, otsu, binarize } from './binarize.js?v=0.8.2';
 import {
   dilate as dilateMask,
   erode as erodeMask,
@@ -19,9 +19,9 @@ import {
   despeckle,
   fillHoles,
   maskStats
-} from './cleanup.js?v=0.8.1';
-import { traceContours } from './marchingSquares.js?v=0.8.1';
-import { chaikin, rdp, fitBeziers } from './simplify.js?v=0.8.1';
+} from './cleanup.js?v=0.8.2';
+import { traceContours } from './marchingSquares.js?v=0.8.2';
+import { chaikin, rdp, fitBeziers } from './simplify.js?v=0.8.2';
 
 /** Id of the most recent request seen by `onmessage`. @private */
 let latestId = -Infinity;

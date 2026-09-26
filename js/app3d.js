@@ -14,11 +14,11 @@
  * (`_frame()`), so the baked body and the plate line up exactly and can be
  * exported as two separate parts for two-colour printing.
  */
-import * as UI from './ui.js?v=0.8.1';
-import { Viewer, MATERIAL_PRESETS } from './three/viewer.js?v=0.8.1';
-import { buildShapes, buildExtrudeGeometry } from './three/extrude.js?v=0.8.1';
-import { toSTLBinary, toOBJ, toPLYBinary } from './three/exporters.js?v=0.8.1';
-import { buildPlateGeometry, geometryArrays } from './three/plateGeometry.js?v=0.8.1';
+import * as UI from './ui.js?v=0.8.2';
+import { Viewer, MATERIAL_PRESETS } from './three/viewer.js?v=0.8.2';
+import { buildShapes, buildExtrudeGeometry } from './three/extrude.js?v=0.8.2';
+import { toSTLBinary, toOBJ, toPLYBinary, to3MF } from './three/exporters.js?v=0.8.2';
+import { buildPlateGeometry, geometryArrays } from './three/plateGeometry.js?v=0.8.2';
 import { zipSync } from 'three/addons/libs/fflate.module.js';
 
 const TARGET_SIZE = 100;
@@ -29,7 +29,7 @@ export class App3D {
     this.els = els;
     this.setStatus = els.setStatus;
     this.viewer = new Viewer(els.canvas);
-    this.worker = new Worker(new URL('./three/meshWorker.js?v=0.8.1', import.meta.url), { type: 'module' });
+    this.worker = new Worker(new URL('./three/meshWorker.js?v=0.8.2', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e) => this._onWorker(e.data);
     this.worker.onerror = (e) => this.setStatus('Mesh worker error: ' + e.message, 'err');
     this.reqId = 0;
@@ -237,7 +237,10 @@ export class App3D {
       { label: 'OBJ', onClick: () => this.export('obj') },
       { label: 'PLY', onClick: () => this.export('ply') }
     ]);
-    this.printBtn = UI.buttons(g, [{ label: 'Print (body + plate .zip)', onClick: () => this.exportPrint(), title: 'Zip with <name>_body.stl and <name>_plate.stl in the same coordinates, ready for a two-colour print.' }])[0];
+    UI.buttons(g, [
+      { label: 'Print (.3mf, 2 parts)', primary: true, onClick: () => this.exportPrint('3mf'), title: 'One 3MF with a single object made of two parts (body + plate), already aligned. Open it in Bambu Studio / OrcaSlicer and give each part its filament.' },
+      { label: 'Print (STL zip)', onClick: () => this.exportPrint('zip'), title: 'Zip with <name>_body.stl and <name>_plate.stl in the same coordinates. Import BOTH files at once and answer Yes to "load as a single object with multiple parts", otherwise the slicer re-centres each one.' }
+    ]);
     UI.slider(g, st, 'exportSizeMm', { label: 'Export size', min: 0, max: 500, step: 1, unit: 'mm', onChange: () => { if (this.viewer.plateMesh) this._updatePlateStats(this.viewer.plateMesh.geometry); }, title: 'Longest side of the exported mesh in mm. 0 keeps the internal units (longest side = 100). STL has no unit, slicers and Blender read it as mm.' });
     UI.note(g, 'Blob mode exports the baked mesh. Export size 0 = longest side 100 units; otherwise the longest side becomes that many mm.');
   }
@@ -878,8 +881,11 @@ export class App3D {
     return { ...a, positions: scaled };
   }
 
-  /** Two-colour print: body + plate as separate STL files in one zip, same coordinates. */
-  exportPrint() {
+  /**
+   * Two-colour print export. '3mf' = one object with two parts (recommended,
+   * keeps the alignment in every slicer); 'zip' = body + plate STL files.
+   */
+  exportPrint(kind = '3mf') {
     const st = this.state;
     if (st.mode !== 'blob') return this.setStatus('Print export works in Blob mode (bake the body first).', 'err');
     if (!this.baked) return this.setStatus('Bake the mesh first.', 'err');
@@ -889,13 +895,30 @@ export class App3D {
     const plate = App3D._scaled(this.viewer.plateArrays(), k);
     const mm = st.exportSizeMm;
     const base = `${this.exportName()}_${st.profile}${mm > 0 ? '_' + mm + 'mm' : ''}`;
+    if (kind === '3mf') {
+      // lay the assembly on the bed: plate bottom at z = 0 (both parts shifted together)
+      let minZ = Infinity;
+      for (let i = 2; i < plate.positions.length; i += 3) if (plate.positions[i] < minZ) minZ = plate.positions[i];
+      for (let i = 2; i < body.positions.length; i += 3) if (body.positions[i] < minZ) minZ = body.positions[i];
+      const lift = (a) => { const p = new Float32Array(a.positions); for (let i = 2; i < p.length; i += 3) p[i] -= minZ; return { ...a, positions: p }; };
+      const files3 = to3MF([
+        { name: 'body', positions: lift(body).positions, indices: body.indices, color: st.color },
+        { name: 'plate', positions: lift(plate).positions, indices: plate.indices, color: st.plateColor }
+      ], base);
+      this.setStatus('Writing 3MF…', 'busy');
+      const zip3 = zipSync(files3, { level: 4 });
+      UI.download(new Blob([zip3], { type: 'model/3mf' }), `${base}_print.3mf`);
+      this.setStatus(`Print export: ${base}_print.3mf (one object, body + plate parts).`);
+      return;
+    }
     const files = {};
     files[`${base}_body.stl`] = new Uint8Array(toSTLBinary(body.positions, body.indices, 'VecTools body'));
     files[`${base}_plate.stl`] = new Uint8Array(toSTLBinary(plate.positions, plate.indices, 'VecTools plate'));
     files['README.txt'] = new TextEncoder().encode(
       `VecTools print export\n\n${base}_body.stl  - the artwork\n${base}_plate.stl - the backing plate\n\n` +
-      'Both files share the same coordinates. In Bambu Studio / OrcaSlicer import both at once and answer YES to ' +
-      '"load these files as a single object with multiple parts", then assign a filament to each part.\n' +
+      'Both files share the same coordinates. In Bambu Studio / OrcaSlicer import BOTH FILES AT ONCE (select both in the open dialog) and answer YES to ' +
+      '"load these files as a single object with multiple parts", then assign a filament to each part. Importing them one by one re-centres each file and loses the alignment. ' +
+      'Tip: the .3mf export avoids this entirely.\n' +
       (mm > 0 ? `Scale: longest side = ${mm} mm.\n` : 'Scale: internal units (longest side = 100). Set Export size (mm) for real dimensions.\n'));
     const zip = zipSync(files, { level: 6 });
     UI.download(new Blob([zip], { type: 'application/zip' }), `${base}_print.zip`);

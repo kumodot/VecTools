@@ -1,5 +1,8 @@
 # VecTools changelog
 
+## 0.8.2 (2026-09-26)
+- **Export > Print (.3mf, 2 parts)**: a single 3MF object made of two components (body + plate) with their relative placement baked in and the plate bottom on z = 0. Bambu Studio / OrcaSlicer / PrusaSlicer open it as one object with two parts, no alignment step, one filament per part. The STL zip stays as an alternative (import both files at once, otherwise the slicer re-centres each one).
+
 ## 0.8.1 (2026-09-26)
 - Cache-proof loading: every internal module import and worker URL carries `?v=<version>`, and the `.bat` launcher now runs `serve.py` (Cache-Control: no-store). Fixes an update running with a stale module from the browser cache (symptom: Plate on but no plate, brush controls greyed out).
 - Print plate UI tolerant to a stale `ui.js`.
