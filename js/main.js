@@ -5,6 +5,8 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.5.0  PNG capture with tiled supersampling (1x-4x, box filtered) and
+ *         progress; Orbit environment toggle + speed for moving reflections.
  *  0.4.1  Export size (mm): optional uniform scale on STL/OBJ/PLY export.
  *  0.4.0  SVG input: drop / load an .svg in either tab, it is rasterized by
  *         the browser (SVG raster slider) and goes through the same pipeline,
@@ -25,7 +27,7 @@
 import { TraceApp } from './appTrace.js';
 import { App3D } from './app3d.js';
 
-export const APP_VERSION = '0.4.1';
+export const APP_VERSION = '0.5.0';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 

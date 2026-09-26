@@ -44,14 +44,14 @@ export class App3D {
       steps: 160, sectionOn: false, sectionZ: 0, backOn: false, backZ: 0,
       bakeRes: 512, smoothIter: 3, minIslandPct: 0,
       // environment
-      hdr: '', hdrBackground: false, hdrBlur: 0, envRotation: 0, envIntensity: 1, exposure: 1,
+      hdr: '', hdrBackground: false, hdrBlur: 0, envRotation: 0, envSpin: false, envSpinSpeed: 20, envIntensity: 1, exposure: 1,
       // material
       preset: 'gold', color: '#ffc14d', metalness: 1, roughness: 0.28,
       // render
       renderScale: 1.5, glow: 0, glowRadius: 0.3, glowThreshold: 1.5,
       wire: false, flat: false, grid: true,
       // capture
-      captureScale: 2, captureTransparent: true,
+      captureScale: 2, captureSupersample: 2, captureTransparent: true,
       exportSizeMm: 0,
       // navigation
       navMode: 'orbit', laziness: 0.5, flySpeed: 60, hidePointer: false
@@ -138,7 +138,9 @@ export class App3D {
     ]);
     UI.checkbox(g, st, 'hdrBackground', { label: 'Show as background', onChange: () => this.viewer.setHdrBackground(st.hdrBackground) });
     UI.slider(g, st, 'hdrBlur', { label: 'Background blur', min: 0, max: 1, step: 0.01, onChange: () => this.viewer.setBackgroundBlur(st.hdrBlur) });
-    UI.slider(g, st, 'envRotation', { label: 'Rotation', min: 0, max: 360, step: 1, unit: '°', onChange: () => this.viewer.setEnvRotation(st.envRotation * Math.PI / 180) });
+    this.envRotSlider = UI.slider(g, st, 'envRotation', { label: 'Rotation', min: 0, max: 360, step: 1, unit: '°', onChange: () => this.viewer.setEnvRotation(st.envRotation * Math.PI / 180) });
+    UI.checkbox(g, st, 'envSpin', { label: 'Orbit environment', onChange: () => this._applyEnvSpin(), title: 'Keeps the environment map turning so reflections travel across the surface. Paused during PNG capture.' });
+    UI.slider(g, st, 'envSpinSpeed', { label: 'Orbit speed', min: -180, max: 180, step: 1, unit: '°/s', onChange: () => this._applyEnvSpin(), title: 'Degrees per second; negative reverses.' });
     UI.slider(g, st, 'envIntensity', { label: 'Intensity', min: 0, max: 4, step: 0.05, onChange: () => this._applyMaterial() });
     UI.slider(g, st, 'exposure', { label: 'Exposure', min: 0.1, max: 3, step: 0.05, onChange: () => this.viewer.setExposure(st.exposure) });
     this.hdrNote = UI.note(g, 'Drop .hdr/.exr files into the hdr/ folder next to the app, then Rescan.');
@@ -171,7 +173,8 @@ export class App3D {
 
     // --- capture ---
     g = UI.group(sb, 'Capture PNG');
-    UI.slider(g, st, 'captureScale', { label: 'Resolution', min: 1, max: 4, step: 0.5, unit: 'x', title: 'Multiplier on the viewport size.' });
+    UI.slider(g, st, 'captureScale', { label: 'Resolution', min: 1, max: 4, step: 0.5, unit: 'x', title: 'Output size as a multiple of the viewport.' });
+    UI.slider(g, st, 'captureSupersample', { label: 'Supersample', min: 1, max: 4, step: 1, unit: 'x', title: 'Anti-aliasing for the saved PNG: renders at N times the output size and box-filters down (4x = 16 samples per pixel). Rendered in tiles, so large outputs are fine.' });
     UI.checkbox(g, st, 'captureTransparent', { label: 'Transparent', title: 'Alpha background, grid hidden. Glow keeps its alpha.' });
     UI.buttons(g, [{ label: 'Save PNG', primary: true, onClick: () => this.capture() }]);
 
@@ -426,8 +429,15 @@ export class App3D {
     this.viewer.setGlow(st.glow, st.glowRadius, st.glowThreshold);
   }
 
+  _applyEnvSpin() {
+    const st = this.state;
+    this.viewer.setEnvSpin(st.envSpin ? st.envSpinSpeed : 0);
+  }
+
   _applyEnvironment() {
     const st = this.state;
+    this.viewer.onEnvRotation = (deg) => { st.envRotation = Math.round(deg); if (this.envRotSlider) this.envRotSlider.set(st.envRotation); };
+    this._applyEnvSpin();
     this.viewer.setHdrBackground(st.hdrBackground);
     this.viewer.setBackgroundBlur(st.hdrBlur);
     this.viewer.setEnvRotation(st.envRotation * Math.PI / 180);
@@ -521,7 +531,10 @@ export class App3D {
     const st = this.state;
     this.setStatus('Rendering PNG…', 'busy');
     try {
-      const blob = await this.viewer.capturePNG({ scale: st.captureScale, transparent: st.captureTransparent });
+      const blob = await this.viewer.capturePNG({
+        scale: st.captureScale, supersample: st.captureSupersample, transparent: st.captureTransparent,
+        onProgress: (f) => this.setStatus(`Rendering PNG… ${Math.round(f * 100)}%`, 'busy')
+      });
       UI.download(blob, `${this.baseName}_${st.mode === 'blob' ? st.profile : 'extrude'}_render.png`);
       this.setStatus('PNG saved.');
     } catch (err) { this.setStatus('Capture failed: ' + err.message, 'err'); }

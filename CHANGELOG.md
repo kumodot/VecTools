@@ -1,5 +1,9 @@
 # VecTools changelog
 
+## 0.5.0 (2026-09-26)
+- PNG capture: new *Supersample* (1x-4x). The image is rendered at N times the output size in tiles (`camera.setViewOffset`, tiles overlap when glow is on) and box-filtered down by successive 2x halvings, so 4x = 16 samples per pixel. Progress shown in the status bar. Large outputs no longer depend on GPU canvas limits.
+- Environment: *Orbit environment* checkbox + *Orbit speed* (°/s, negative reverses) keep the HDR turning so reflections move across the surface. The Rotation slider follows, so projects save the current angle. Paused during capture.
+
 ## 0.4.1 (2026-09-16)
 - *Export size (mm)* in the Export group: 0 keeps the internal units (longest side = 100), otherwise the exported STL/OBJ/PLY is scaled so its longest side is that many mm. File name gets a `_<mm>mm` suffix.
 - `index.html` now reads `version.json` (no-store) before redirecting, so a cached index on GitHub Pages can no longer point at a removed build.

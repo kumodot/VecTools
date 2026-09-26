@@ -3,11 +3,27 @@
 <head>
 <meta charset="utf-8">
 <title>VecTools</title>
-<!-- Entry point for static hosting (GitHub Pages). The real app keeps its version in the file name. -->
-<meta http-equiv="refresh" content="0; url=VecTools_v0.4.1.html">
-<script>location.replace('VecTools_v0.4.1.html' + location.search + location.hash);</script>
+<meta http-equiv="Cache-Control" content="no-store">
+<!--
+  Entry point for static hosting (GitHub Pages). The app keeps its version in the
+  file name, so this page looks up the current one in version.json (fetched with
+  cache: no-store, so a cached copy of this page still lands on the right build)
+  and jumps there. version.json is the single thing to edit on a version bump.
+-->
 </head>
 <body style="background:#16171a;color:#9a9ea6;font-family:system-ui;padding:24px">
-Loading VecTools… <a href="VecTools_v0.4.1.html" style="color:#4fc3f7">open</a>
+<p id="msg">Loading VecTools…</p>
+<script>
+(async () => {
+  const fallback = 'VecTools_v0.5.0.html';
+  let entry = fallback;
+  try {
+    const r = await fetch('version.json?ts=' + Date.now(), { cache: 'no-store' });
+    if (r.ok) { const j = await r.json(); if (j && j.entry) entry = j.entry; }
+  } catch (_) {}
+  location.replace(entry + location.search + location.hash);
+})();
+</script>
+<noscript>JavaScript is required. <a href="VecTools_v0.5.0.html">Open VecTools</a></noscript>
 </body>
 </html>

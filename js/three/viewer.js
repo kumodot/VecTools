@@ -66,6 +66,9 @@ export class Viewer {
     this.navMode = 'orbit';
     this.hidePointer = false;
     this._lastT = performance.now();
+    this.envSpinSpeed = 0;        // degrees per second, 0 = off
+    this.envRotationDeg = 0;
+    this.onEnvRotation = null;    // (deg) => void, lets the UI slider follow the spin
     canvas.addEventListener('pointerdown', () => { if (this.navMode === 'orbit' && this.hidePointer) canvas.style.cursor = 'none'; });
     window.addEventListener('pointerup', () => { if (this.navMode === 'orbit') canvas.style.cursor = ''; });
 
@@ -157,7 +160,13 @@ export class Viewer {
     const now = performance.now();
     const dt = (now - this._lastT) / 1000;
     this._lastT = now;
-    const moved = this.navMode === 'fly' ? this.fly.update(dt) : this.controls.update();
+    let moved = this.navMode === 'fly' ? this.fly.update(dt) : this.controls.update();
+    if (this.envSpinSpeed !== 0 && !this._capturing) {
+      this.envRotationDeg = (this.envRotationDeg + this.envSpinSpeed * Math.min(dt, 0.1) + 360) % 360;
+      this.setEnvRotation(this.envRotationDeg * Math.PI / 180);
+      if (this.onEnvRotation) this.onEnvRotation(this.envRotationDeg);
+      moved = true;
+    }
     if (!this._needs && !moved) return;
     this._needs = false;
     this._render();
@@ -306,9 +315,17 @@ export class Viewer {
 
   /** Rotate the environment (and background) around the vertical axis, radians. */
   setEnvRotation(rad) {
+    this.envRotationDeg = ((rad * 180 / Math.PI) % 360 + 360) % 360;
     this.scene.environmentRotation.set(0, rad, 0);
     this.scene.backgroundRotation.set(0, rad, 0);
     this.raymarch.setEnvRotation(rad);
+    this.invalidate();
+  }
+
+  /** Continuous environment spin, degrees per second (0 stops). */
+  setEnvSpin(degPerSec) {
+    this.envSpinSpeed = degPerSec;
+    this._lastT = performance.now();
     this.invalidate();
   }
 
@@ -385,36 +402,97 @@ export class Viewer {
    *   scale multiplies the on-screen resolution (2 = twice the pixels per side)
    * @returns {Promise<Blob>}
    */
-  capturePNG(o = {}) {
+  /**
+   * Render a PNG of the current view with supersampling.
+   *
+   * The image is rendered at (viewport * scale * supersample) pixels in tiles
+   * (camera.setViewOffset), assembled on a 2D canvas, then reduced to the
+   * requested size by successive 2x halvings (each halving is an exact 2x2 box
+   * average, so supersample 4 = 16 samples per output pixel). Tiling keeps GPU
+   * memory bounded no matter how large the output is. With glow enabled the
+   * tiles overlap so the bloom halo is continuous across seams.
+   *
+   * @param {{scale?: number, supersample?: number, transparent?: boolean, hideGrid?: boolean, onProgress?: (f: number) => void}} o
+   *   scale multiplies the on-screen size (2 = twice the pixels per side);
+   *   supersample is the extra AA factor (1..4).
+   * @returns {Promise<Blob>}
+   */
+  async capturePNG(o = {}) {
     const scale = o.scale ?? 2;
+    const ss = Math.max(1, Math.min(4, Math.round(o.supersample ?? 2)));
     const transparent = o.transparent ?? true;
+    const outW = Math.round(this._w * this.baseRatio * scale);
+    const outH = Math.round(this._h * this.baseRatio * scale);
+    const fullW = outW * ss, fullH = outH * ss;
+
+    // tile size: bounded by GPU limits and memory (HalfFloat + 4x MSAA target)
+    const maxTex = Math.min(this.renderer.capabilities.maxTextureSize || 2048, 2048); // HalfFloat + 4x MSAA target: keep tiles modest
+    const glow = this.bloomPass.enabled;
+    const pad = glow ? 256 : 0;                 // overlap so bloom halos cross tile seams
+    const tile = Math.max(512, maxTex - 2 * pad);
+    const cols = Math.ceil(fullW / tile), rows = Math.ceil(fullH / tile);
+
     const prevBg = this.scene.background;
     const prevGrid = this.grid.visible;
     const prevRatio = this.baseRatio * this.renderScale;
-    const ratio = this.baseRatio * scale;
     if (transparent) this.scene.background = null;
     if (o.hideGrid ?? transparent) this.grid.visible = false;
-    this.alphaPass.enabled = transparent && this.bloomPass.enabled;
-    this.renderer.setPixelRatio(ratio);
-    this.renderer.setSize(this._w, this._h, false);
-    this.composer.setPixelRatio(ratio);
-    this.composer.setSize(this._w, this._h);
+    this.alphaPass.enabled = transparent && glow;
     this.renderer.setClearColor(0x000000, transparent ? 0 : 1);
-    this._render();
-    return new Promise((resolve) => {
-      this.canvas.toBlob((blob) => {
-        // restore
-        this.scene.background = prevBg;
-        this.grid.visible = prevGrid;
-        this.alphaPass.enabled = false;
-        this.renderer.setClearColor(0x000000, 1);
-        this.renderer.setPixelRatio(prevRatio);
-        this.renderer.setSize(this._w, this._h, false);
-        this.composer.setPixelRatio(prevRatio);
-        this.composer.setSize(this._w, this._h);
-        this.invalidate();
-        resolve(blob);
-      }, 'image/png');
-    });
+
+    this._capturing = true;
+    const full = document.createElement('canvas');
+    full.width = fullW; full.height = fullH;
+    const fctx = full.getContext('2d');
+
+    try {
+      let done = 0;
+      for (let ty = 0; ty < rows; ty++) {
+        for (let tx = 0; tx < cols; tx++) {
+          const x0 = tx * tile, y0 = ty * tile;
+          const w = Math.min(tile, fullW - x0), h = Math.min(tile, fullH - y0);
+          // render region including padding (clamped to the full image)
+          const rx = Math.max(0, x0 - pad), ry = Math.max(0, y0 - pad);
+          const rw = Math.min(fullW, x0 + w + pad) - rx, rh = Math.min(fullH, y0 + h + pad) - ry;
+          this.camera.setViewOffset(fullW, fullH, rx, ry, rw, rh);
+          this.renderer.setPixelRatio(1);
+          this.renderer.setSize(rw, rh, false);
+          this.composer.setPixelRatio(1);
+          this.composer.setSize(rw, rh);
+          this._render();
+          fctx.drawImage(this.canvas, x0 - rx, y0 - ry, w, h, x0, y0, w, h);
+          done++;
+          if (o.onProgress) o.onProgress(done / (rows * cols));
+          // let the browser breathe between tiles so the UI can show progress
+          await new Promise((r) => setTimeout(r, 0));
+        }
+      }
+    } finally {
+      this._capturing = false;
+      this.camera.clearViewOffset();
+      this.scene.background = prevBg;
+      this.grid.visible = prevGrid;
+      this.alphaPass.enabled = false;
+      this.renderer.setClearColor(0x000000, 1);
+      this.renderer.setPixelRatio(prevRatio);
+      this.renderer.setSize(this._w, this._h, false);
+      this.composer.setPixelRatio(prevRatio);
+      this.composer.setSize(this._w, this._h);
+      this.invalidate();
+    }
+
+    // box downsample by successive halvings (bilinear at exactly 2:1 = 2x2 average)
+    let src = full;
+    let f = ss;
+    while (f > 1) {
+      const step = (f % 2 === 0) ? 2 : f;   // odd factors (3) in one bilinear step
+      const dst = document.createElement('canvas');
+      dst.width = Math.round(src.width / step); dst.height = Math.round(src.height / step);
+      const c = dst.getContext('2d');
+      c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+      c.drawImage(src, 0, 0, dst.width, dst.height);
+      src = dst; f /= step;
+    }
+    return new Promise((resolve, reject) => src.toBlob((b) => b ? resolve(b) : reject(new Error('toBlob failed')), 'image/png'));
   }
 }
