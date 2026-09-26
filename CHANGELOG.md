@@ -1,5 +1,8 @@
 # VecTools changelog
 
+## 0.6.1 (2026-09-26)
+- Bake workflow: changing any shape setting (Blob, cuts, raster) while *Baked mesh* is on screen now switches the view back to the live *Preview*, so the change is visible immediately. The previous bake stays in memory as *Baked mesh (old)* (still viewable and exportable) until you Bake again. Bake-only settings (Voxel res, Smooth, Drop islands) keep the current view and just light up the button.
+
 ## 0.6.0 (2026-09-26)
 - *Width → thickness* (Blob group): thickness by coverage. The 2D local stroke-width map (the same field behind *Local-width dome*) now scales the base half thickness, so thin strokes get a thinner, rounder slab like ink would, in every profile. *Width ref* (0 = auto, widest part), *Width floor* (hairlines never vanish) and *Width curve* control it. Preview and bake.
 - Capture: *Longest side* in pixels replaces the viewport multiplier; the group shows the exact output size (and the supersampled render size) for the current viewport.

@@ -347,15 +347,28 @@ export class App3D {
   _updatePreviewParams() {
     this.viewer.raymarch.setParams(this._pixelParams());
     this.viewer.invalidate();
-    if (this.baked) this._markBakeDirty();
+    // A shape change while the baked mesh is on screen would be invisible:
+    // flip back to the live preview so the change shows right away. The old
+    // bake stays in memory (still exportable) until the next Bake.
+    if (this.baked) this._markBakeDirty(true);
   }
 
-  /** Highlight the Bake button: the baked mesh no longer matches the settings. */
-  _markBakeDirty() {
+  /**
+   * Highlight the Bake button: the baked mesh no longer matches the settings.
+   * @param {boolean} shapeChanged true when the change is visible in the preview
+   *   (blob params, cuts, raster); false for bake-only settings (voxel res, smooth).
+   */
+  _markBakeDirty(shapeChanged = false) {
     if (!this.bakeBtn) return;
     this.bakeDirty = true;
     this.bakeBtn.classList.add('dirty');
     this.bakeBtn.textContent = this.baked ? 'Bake mesh (changed)' : 'Bake mesh';
+    if (this.baked) this._setBakedLabel('Baked mesh (old)');
+    if (shapeChanged && this.baked && this.showBaked) {
+      this.showBaked = false;
+      this.viewSeg.set(false);
+      this._applyVisibility();
+    }
   }
 
   _clearBakeDirty() {
@@ -363,6 +376,12 @@ export class App3D {
     if (!this.bakeBtn) return;
     this.bakeBtn.classList.remove('dirty');
     this.bakeBtn.textContent = 'Bake mesh';
+    this._setBakedLabel('Baked mesh');
+  }
+
+  _setBakedLabel(text) {
+    const b = this.viewSeg && this.viewSeg.el.querySelectorAll('button')[1];
+    if (b) b.textContent = text;
   }
 
   bake() {

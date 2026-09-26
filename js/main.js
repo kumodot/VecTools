@@ -5,6 +5,9 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.6.1  Changing a shape setting while the baked mesh is on screen now flips
+ *         the view back to the live preview; the old bake stays available as
+ *         "Baked mesh (old)" until the next Bake.
  *  0.6.0  Width -> thickness: base slab thickness follows the local stroke
  *         width map (ink-like), with reference width, floor and curve.
  *         Capture size in pixels (longest side) with live output size info.
@@ -30,7 +33,7 @@
 import { TraceApp } from './appTrace.js';
 import { App3D } from './app3d.js';
 
-export const APP_VERSION = '0.6.0';
+export const APP_VERSION = '0.6.1';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 
