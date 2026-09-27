@@ -37,7 +37,7 @@ The lettering above is `Samples/VecTools_Sample.jpg` traced and inflated with th
 
 ## Run it
 
-**Local (recommended):** download / clone, double-click `RUN_VecTools_v0.8.3.bat`. It starts `serve.py` (a no-cache static server) on port 8765 and opens the app. Python 3 required (ES modules and Web Workers do not load from `file://`). On macOS/Linux: `python3 -m http.server 8765` in the folder, then open `http://localhost:8765/`.
+**Local (recommended):** download / clone, double-click `RUN_VecTools_v0.8.4.bat`. It starts `serve.py` (a no-cache static server) on port 8765 and opens the app. Python 3 required (ES modules and Web Workers do not load from `file://`). On macOS/Linux: `python3 -m http.server 8765` in the folder, then open `http://localhost:8765/`.
 
 **Hosted:** it is a static site, so any static host works. `index.html` redirects to the current versioned entry file.
 

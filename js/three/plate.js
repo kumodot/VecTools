@@ -28,10 +28,10 @@
  *
  * Pure functions, no DOM: this file runs inside the mesh worker.
  */
-import { distanceTransform } from './edt.js?v=0.8.3';
-import { labelComponents } from '../trace/cleanup.js?v=0.8.3';
-import { traceContours } from '../trace/marchingSquares.js?v=0.8.3';
-import { chaikin, rdp } from '../trace/simplify.js?v=0.8.3';
+import { distanceTransform } from './edt.js?v=0.8.4';
+import { labelComponents } from '../trace/cleanup.js?v=0.8.4';
+import { traceContours } from '../trace/marchingSquares.js?v=0.8.4';
+import { chaikin, rdp } from '../trace/simplify.js?v=0.8.4';
 
 /**
  * Andrew's monotone chain convex hull.

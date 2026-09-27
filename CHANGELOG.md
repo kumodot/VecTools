@@ -1,5 +1,8 @@
 # VecTools changelog
 
+## 0.8.4 (2026-09-27)
+- Render > **Backdrop**: a soft bluish gradient behind the scene, on by default, hideable with a checkbox like *Floor grid*. Makes a dark plate readable against the viewport. Automatically hidden behind an HDR background and in transparent PNG captures.
+
 ## 0.8.3 (2026-09-27)
 - Strut brush: each stroke is cleaned when you release the button (jitter removal, resample at ~0.6x brush width, two Chaikin passes, endpoints pinned), so a strut is a few smooth points instead of every mouse sample. Sharp turns stay turns, just rounded. The cleaned stroke is what the overlay shows and what the project saves.
 

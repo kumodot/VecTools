@@ -12,7 +12,7 @@
  * plane (the Cut back depth) plus a small embed so the two parts overlap.
  */
 import * as THREE from 'three';
-import { buildShapes } from './extrude.js?v=0.8.3';
+import { buildShapes } from './extrude.js?v=0.8.4';
 
 /**
  * @param {Array<{pts: Float32Array, level: number, isHole: boolean, area: number}>} contours

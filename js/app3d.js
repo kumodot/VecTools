@@ -14,12 +14,12 @@
  * (`_frame()`), so the baked body and the plate line up exactly and can be
  * exported as two separate parts for two-colour printing.
  */
-import * as UI from './ui.js?v=0.8.3';
-import { Viewer, MATERIAL_PRESETS } from './three/viewer.js?v=0.8.3';
-import { buildShapes, buildExtrudeGeometry } from './three/extrude.js?v=0.8.3';
-import { toSTLBinary, toOBJ, toPLYBinary, to3MF } from './three/exporters.js?v=0.8.3';
-import { buildPlateGeometry, geometryArrays } from './three/plateGeometry.js?v=0.8.3';
-import { cleanStroke } from './three/strokeUtils.js?v=0.8.3';
+import * as UI from './ui.js?v=0.8.4';
+import { Viewer, MATERIAL_PRESETS } from './three/viewer.js?v=0.8.4';
+import { buildShapes, buildExtrudeGeometry } from './three/extrude.js?v=0.8.4';
+import { toSTLBinary, toOBJ, toPLYBinary, to3MF } from './three/exporters.js?v=0.8.4';
+import { buildPlateGeometry, geometryArrays } from './three/plateGeometry.js?v=0.8.4';
+import { cleanStroke } from './three/strokeUtils.js?v=0.8.4';
 import { zipSync } from 'three/addons/libs/fflate.module.js';
 
 const TARGET_SIZE = 100;
@@ -30,7 +30,7 @@ export class App3D {
     this.els = els;
     this.setStatus = els.setStatus;
     this.viewer = new Viewer(els.canvas);
-    this.worker = new Worker(new URL('./three/meshWorker.js?v=0.8.3', import.meta.url), { type: 'module' });
+    this.worker = new Worker(new URL('./three/meshWorker.js?v=0.8.4', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e) => this._onWorker(e.data);
     this.worker.onerror = (e) => this.setStatus('Mesh worker error: ' + e.message, 'err');
     this.reqId = 0;
@@ -63,7 +63,7 @@ export class App3D {
       preset: 'gold', color: '#ffc14d', metalness: 1, roughness: 0.28,
       // render
       renderScale: 1.5, glow: 0, glowRadius: 0.3, glowThreshold: 1.5,
-      wire: false, flat: false, grid: true,
+      wire: false, flat: false, grid: true, backdrop: true,
       // capture
       captureLongest: 2048, captureSupersample: 2, captureTransparent: true,
       exportSizeMm: 0,
@@ -212,6 +212,7 @@ export class App3D {
     UI.checkbox(g, st, 'wire', { label: 'Wireframe', onChange: () => this.viewer.setWireframe(st.wire) });
     UI.checkbox(g, st, 'flat', { label: 'Flat shading', onChange: () => this.viewer.setFlatShading(st.flat) });
     UI.checkbox(g, st, 'grid', { label: 'Floor grid', onChange: () => this.viewer.setGrid(st.grid) });
+    UI.checkbox(g, st, 'backdrop', { label: 'Backdrop', onChange: () => this.viewer.setBackdrop(st.backdrop), title: 'Soft bluish gradient behind the scene so dark parts (like the plate) read against the background. Hidden behind an HDR background and in transparent captures.' });
     UI.buttons(g, [{ label: 'Frame view', onClick: () => this.viewer.frame(TARGET_SIZE) }]);
 
     // --- navigation ---
@@ -712,6 +713,7 @@ export class App3D {
     this.viewer.setWireframe(st.wire);
     this.viewer.setFlatShading(st.flat);
     this.viewer.setGrid(st.grid);
+    this.viewer.setBackdrop(st.backdrop);
     this._applyGlow();
     this._applyMaterial();
     this.viewer.setLaziness(st.laziness);

@@ -15,8 +15,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { RaymarchPreview } from './raymarch.js?v=0.8.3';
-import { FlyControls } from './flyControls.js?v=0.8.3';
+import { RaymarchPreview } from './raymarch.js?v=0.8.4';
+import { FlyControls } from './flyControls.js?v=0.8.4';
 
 export const MATERIAL_PRESETS = {
   gold:   { color: '#ffc14d', metalness: 1.0, roughness: 0.28 },
@@ -88,6 +88,21 @@ export class Viewer {
     this.lights = new THREE.Group();
     this.lights.add(key, fill, new THREE.AmbientLight(0xffffff, 0.1));
     this.scene.add(this.lights);
+
+    // gradient backdrop: a fullscreen triangle drawn first, behind everything (helps dark parts read against black)
+    this.backdrop = new THREE.Mesh(
+      new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3)),
+      new THREE.ShaderMaterial({
+        depthTest: false, depthWrite: false,
+        uniforms: { uTop: { value: new THREE.Color(0x2a3550) }, uBottom: { value: new THREE.Color(0x0a0c12) } },
+        vertexShader: 'varying float vY; void main(){ vY = position.y * 0.5 + 0.5; gl_Position = vec4(position.xy, 0.999999, 1.0); }',
+        fragmentShader: 'uniform vec3 uTop, uBottom; varying float vY; void main(){ float t = smoothstep(0.0, 1.0, vY); gl_FragColor = vec4(mix(uBottom, uTop, t * t * 0.9 + 0.05), 1.0); }'
+      })
+    );
+    this.backdrop.frustumCulled = false;
+    this.backdrop.renderOrder = -1000;
+    this.backdrop.visible = true;
+    this.scene.add(this.backdrop);
 
     this.grid = new THREE.GridHelper(240, 24, 0x2c3036, 0x22252a);
     this.grid.position.y = -58; // floor under a 100-unit sign
@@ -253,6 +268,13 @@ export class Viewer {
 
   setGrid(on) { this.grid.visible = on; this.invalidate(); }
 
+  /** Gradient backdrop on/off (hidden automatically behind an HDR background and in transparent captures). */
+  setBackdrop(on) { this._backdrop = !!on; this._applyBackdrop(); }
+  _applyBackdrop() {
+    this.backdrop.visible = !!this._backdrop && !(this.showHdrBackground && this.hdrTexture);
+    this.invalidate();
+  }
+
   /** Bloom strength; 0 disables the pass. */
   setGlow(strength, radius = 0.3, threshold = 1.5) {
     this.bloomPass.strength = strength;
@@ -321,6 +343,7 @@ export class Viewer {
 
   _applyBackground() {
     this.scene.background = (this.showHdrBackground && this.hdrTexture) ? this.hdrTexture : this.bgColor;
+    if (this.backdrop) this._applyBackdrop();
   }
 
   /** Rotate the environment (and background) around the vertical axis, radians. */
@@ -529,7 +552,8 @@ export class Viewer {
     const prevBg = this.scene.background;
     const prevGrid = this.grid.visible;
     const prevRatio = this.baseRatio * this.renderScale;
-    if (transparent) this.scene.background = null;
+    const prevBackdrop = this.backdrop.visible;
+    if (transparent) { this.scene.background = null; this.backdrop.visible = false; }
     if (o.hideGrid ?? transparent) this.grid.visible = false;
     this.alphaPass.enabled = transparent && glow;
     this.renderer.setClearColor(0x000000, transparent ? 0 : 1);
@@ -566,6 +590,7 @@ export class Viewer {
       this.camera.clearViewOffset();
       this.scene.background = prevBg;
       this.grid.visible = prevGrid;
+      this.backdrop.visible = prevBackdrop;
       this.alphaPass.enabled = false;
       this.renderer.setClearColor(0x000000, 1);
       this.renderer.setPixelRatio(prevRatio);

@@ -28,11 +28,11 @@
  * No external dependencies beyond the sibling modules in this folder.
  */
 
-import { buildField, gridToWorld, PROFILES } from './sdfField.js?v=0.8.3';
-import { marchingCubes } from './marchingCubes.js?v=0.8.3';
-import { weldVertices, taubinSmooth, computeNormals } from './smooth.js?v=0.8.3';
-import { signedDistanceField, localThickness } from './edt.js?v=0.8.3';
-import { buildPlate } from './plate.js?v=0.8.3';
+import { buildField, gridToWorld, PROFILES } from './sdfField.js?v=0.8.4';
+import { marchingCubes } from './marchingCubes.js?v=0.8.4';
+import { weldVertices, taubinSmooth, computeNormals } from './smooth.js?v=0.8.4';
+import { signedDistanceField, localThickness } from './edt.js?v=0.8.4';
+import { buildPlate } from './plate.js?v=0.8.4';
 
 /**
  * Current high-resolution time in milliseconds.

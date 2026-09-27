@@ -5,6 +5,8 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.8.4  Render > Backdrop: soft bluish gradient behind the scene (checkbox,
+ *         like Floor grid) so dark plates read against the background.
  *  0.8.3  Strut brush strokes are cleaned on release (RDP, resample, Chaikin):
  *         few smooth points, corners kept, no pointer jitter in the strut.
  *  0.8.2  Export > Print (.3mf, 2 parts): one 3MF object with body + plate
@@ -54,10 +56,10 @@
  *         three profiles, realtime raymarch preview, marching-cubes bake,
  *         STL/OBJ/PLY export).
  */
-import { TraceApp } from './appTrace.js?v=0.8.3';
-import { App3D } from './app3d.js?v=0.8.3';
+import { TraceApp } from './appTrace.js?v=0.8.4';
+import { App3D } from './app3d.js?v=0.8.4';
 
-export const APP_VERSION = '0.8.3';
+export const APP_VERSION = '0.8.4';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 
