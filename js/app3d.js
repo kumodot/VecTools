@@ -14,11 +14,12 @@
  * (`_frame()`), so the baked body and the plate line up exactly and can be
  * exported as two separate parts for two-colour printing.
  */
-import * as UI from './ui.js?v=0.8.2';
-import { Viewer, MATERIAL_PRESETS } from './three/viewer.js?v=0.8.2';
-import { buildShapes, buildExtrudeGeometry } from './three/extrude.js?v=0.8.2';
-import { toSTLBinary, toOBJ, toPLYBinary, to3MF } from './three/exporters.js?v=0.8.2';
-import { buildPlateGeometry, geometryArrays } from './three/plateGeometry.js?v=0.8.2';
+import * as UI from './ui.js?v=0.8.3';
+import { Viewer, MATERIAL_PRESETS } from './three/viewer.js?v=0.8.3';
+import { buildShapes, buildExtrudeGeometry } from './three/extrude.js?v=0.8.3';
+import { toSTLBinary, toOBJ, toPLYBinary, to3MF } from './three/exporters.js?v=0.8.3';
+import { buildPlateGeometry, geometryArrays } from './three/plateGeometry.js?v=0.8.3';
+import { cleanStroke } from './three/strokeUtils.js?v=0.8.3';
 import { zipSync } from 'three/addons/libs/fflate.module.js';
 
 const TARGET_SIZE = 100;
@@ -29,7 +30,7 @@ export class App3D {
     this.els = els;
     this.setStatus = els.setStatus;
     this.viewer = new Viewer(els.canvas);
-    this.worker = new Worker(new URL('./three/meshWorker.js?v=0.8.2', import.meta.url), { type: 'module' });
+    this.worker = new Worker(new URL('./three/meshWorker.js?v=0.8.3', import.meta.url), { type: 'module' });
     this.worker.onmessage = (e) => this._onWorker(e.data);
     this.worker.onerror = (e) => this.setStatus('Mesh worker error: ' + e.message, 'err');
     this.reqId = 0;
@@ -476,6 +477,8 @@ export class App3D {
     const finish = () => {
       if (!this._liveStroke) return;
       const st = this._liveStroke; this._liveStroke = null;
+      // few, evenly spaced, smoothed points: no pointer jitter in the strut
+      st.pts = cleanStroke(st.pts, st.width);
       this.state.plateStrokes.push(st);
       this._refreshStrokeOverlay();
       this._requestPlate();

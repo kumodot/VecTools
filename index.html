@@ -15,7 +15,7 @@
 <p id="msg">Loading VecTools…</p>
 <script>
 (async () => {
-  const fallback = 'VecTools_v0.8.2.html';
+  const fallback = 'VecTools_v0.8.3.html';
   let entry = fallback;
   try {
     const r = await fetch('version.json?ts=' + Date.now(), { cache: 'no-store' });
@@ -24,6 +24,6 @@
   location.replace(entry + location.search + location.hash);
 })();
 </script>
-<noscript>JavaScript is required. <a href="VecTools_v0.8.2.html">Open VecTools</a></noscript>
+<noscript>JavaScript is required. <a href="VecTools_v0.8.3.html">Open VecTools</a></noscript>
 </body>
 </html>

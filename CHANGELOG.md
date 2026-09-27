@@ -1,5 +1,8 @@
 # VecTools changelog
 
+## 0.8.3 (2026-09-27)
+- Strut brush: each stroke is cleaned when you release the button (jitter removal, resample at ~0.6x brush width, two Chaikin passes, endpoints pinned), so a strut is a few smooth points instead of every mouse sample. Sharp turns stay turns, just rounded. The cleaned stroke is what the overlay shows and what the project saves.
+
 ## 0.8.2 (2026-09-26)
 - **Export > Print (.3mf, 2 parts)**: a single 3MF object made of two components (body + plate) with their relative placement baked in and the plate bottom on z = 0. Bambu Studio / OrcaSlicer / PrusaSlicer open it as one object with two parts, no alignment step, one filament per part. The STL zip stays as an alternative (import both files at once, otherwise the slicer re-centres each one).
 

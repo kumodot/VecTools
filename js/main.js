@@ -5,6 +5,8 @@
  * Marcelo Souza / Kumodot.art - 2026 // @Msouza3d
  *
  * CHANGELOG
+ *  0.8.3  Strut brush strokes are cleaned on release (RDP, resample, Chaikin):
+ *         few smooth points, corners kept, no pointer jitter in the strut.
  *  0.8.2  Export > Print (.3mf, 2 parts): one 3MF object with body + plate
  *         components, aligned and laid on the bed, for Bambu / Orca / Prusa.
  *  0.8.1  Cache-proof loading: every module import carries ?v=, the .bat
@@ -52,10 +54,10 @@
  *         three profiles, realtime raymarch preview, marching-cubes bake,
  *         STL/OBJ/PLY export).
  */
-import { TraceApp } from './appTrace.js?v=0.8.2';
-import { App3D } from './app3d.js?v=0.8.2';
+import { TraceApp } from './appTrace.js?v=0.8.3';
+import { App3D } from './app3d.js?v=0.8.3';
 
-export const APP_VERSION = '0.8.2';
+export const APP_VERSION = '0.8.3';
 export const PROJECT_EXT = '.vtools';
 export const APP_NAME = 'VecTools';
 
